@@ -180,9 +180,9 @@ ManipulationGroup:AddToggle('HipHeightEnabled', {
 
 ManipulationGroup:AddSlider('HipHeightValue', {
     Text = 'Crouch Height',
-    Default = 2, -- Better default value
-    Min = 2, -- Minimum safe value
-    Max = 50,
+    Default = 3, -- Better default value
+    Min = 3, -- Minimum safe value
+    Max = 100,
     Rounding = 1,
     Compact = false,
 })
@@ -262,7 +262,7 @@ LeftGroupBox1:AddDropdown('TargetHitbox', {
 
 LeftGroupBox1:AddDropdown('AimbotCheck', {
     Values = { 'Wallcheck', 'ForceField', 'Knocked', 'TeamCheck' },
-    Default = 1,
+    Default = 0,
     Multi = true,
     Text = 'Aimbot Checks',
     Tooltip = 'Checks to apply before aiming',
@@ -346,6 +346,7 @@ LeftGroupBox2:AddSlider('FOVThickness', {
     end
 })
 
+-- ESP Settings using esp-lib
 LeftGroupBox:AddToggle('ESPEnabled', {
     Text = 'Enable ESP',
     Default = false,
@@ -361,19 +362,40 @@ LeftGroupBox:AddToggle('BoxESP', {
     Title = 'Box ESP Color',
 })
 
-LeftGroupBox:AddToggle('SkeletonESP', {
-    Text = 'Skeleton',
+LeftGroupBox:AddDropdown('BoxType', {
+    Values = { 'Normal', 'Corner' },
+    Default = 1,
+    Multi = false,
+    Text = 'Box Type',
+    Tooltip = 'Type of box to display',
+})
+
+LeftGroupBox:AddToggle('BoxFill', {
+    Text = 'Box Fill',
     Default = false,
-    Tooltip = 'Toggle skeleton ESP on players',
-}):AddColorPicker('SkeletonESPColor', {
-    Default = Color3.new(1, 1, 1),
-    Title = 'Skeleton ESP Color',
+    Tooltip = 'Toggle filled box ESP',
+}):AddColorPicker('BoxFillColor', {
+    Default = Color3.new(1, 0, 0), -- Red default color
+    Title = 'Box Fill Color',
+    Transparency = 0.5, -- This adds the transparency slider!
+})
+
+LeftGroupBox:AddSlider('BoxPadding', {
+    Text = 'Box Padding',
+    Default = 1.15,
+    Min = 1,
+    Max = 2,
+    Rounding = 2,
+    Compact = false,
 })
 
 LeftGroupBox:AddToggle('HealthBarESP', {
     Text = 'Health Bar ESP',
     Default = false,
     Tooltip = 'Toggle health bar ESP on players',
+}):AddColorPicker('HealthBarColor', {
+    Default = Color3.new(0, 1, 0),
+    Title = 'Health Bar Color',
 })
 
 LeftGroupBox:AddToggle('NameESP', {
@@ -385,16 +407,33 @@ LeftGroupBox:AddToggle('NameESP', {
     Title = 'Name ESP Color',
 })
 
+LeftGroupBox:AddSlider('NameSize', {
+    Text = 'Name Size',
+    Default = 13,
+    Min = 8,
+    Max = 20,
+    Rounding = 0,
+    Compact = false,
+})
+
 LeftGroupBox:AddToggle('DistanceESP', {
     Text = 'Distance ESP',
     Default = false,
     Tooltip = 'Show distance to players',
 }):AddColorPicker('DistanceESPColor', {
-    Default = Color3.new(0.8, 0.8, 0.8),
+    Default = Color3.new(1, 1, 1),
     Title = 'Distance ESP Color',
 })
 
--- Add new Tracer ESP toggle with options
+LeftGroupBox:AddSlider('DistanceSize', {
+    Text = 'Distance Size',
+    Default = 13,
+    Min = 8,
+    Max = 20,
+    Rounding = 0,
+    Compact = false,
+})
+
 LeftGroupBox:AddToggle('TracerESP', {
     Text = 'Tracer ESP',
     Default = false,
@@ -405,26 +444,16 @@ LeftGroupBox:AddToggle('TracerESP', {
 })
 
 LeftGroupBox:AddDropdown('TracerOrigin', {
-    Values = { 'Top', 'Middle', 'Bottom', 'Mouse' },
+    Values = { 'Mouse', 'Top', 'Bottom', 'Center' }, -- Removed 'Head' and kept 'Top'
     Default = 1,
     Multi = false,
     Text = 'Tracer Origin',
     Tooltip = 'Where the tracer line starts from',
 })
 
--- Add new Weapon ESP toggle
-LeftGroupBox:AddToggle('WeaponESP', {
-    Text = 'Weapon ESP',
-    Default = false,
-    Tooltip = 'Show equipped weapon name',
-}):AddColorPicker('WeaponColor', {
-    Default = Color3.new(1, 0.5, 0),
-    Title = 'Weapon Color',
-})
-
 LeftGroupBox:AddSlider('RenderDistance', {
     Text = 'Render Distance',
-    Default = 100,
+    Default = 1500,
     Min = 50,
     Max = 5000,
     Rounding = 1,
@@ -438,7 +467,7 @@ LeftGroupBox:AddSlider('RenderDistance', {
 local selectedChecks = {}
 LeftGroupBox:AddDropdown('MyMultiDropdown', {
     Values = { 'Wallcheck', 'ForceField', 'Knocked', 'TeamCheck' },
-    Default = 1,
+    Default = 0,
     Multi = true, 
     Text = 'ESP Checks',
     Tooltip = 'Select which checks to apply to ESP', 
@@ -742,417 +771,819 @@ local freeCamRotating = false
 local freeCamKeysDown = {}
 local anchoredParts = {}
 
-local Skeleton_Lines = {}
+-- Initialize ESP Library
+local esplib = {
+    box = {
+        enabled = false,
+        type = "normal", -- normal, corner
+        padding = 1.15,
+        fill = Color3.new(1,1,1),
+        outline = Color3.new(0,0,0),
+		fillEnabled = false,
+        fillColor = Color3.new(1,0,0), 
+        fillTransparency = 0.5,
+    },
+    healthbar = {
+        enabled = false,
+        fill = Color3.new(0,1,0),
+        outline = Color3.new(0,0,0),
+    },
+    name = {
+        enabled = false,
+        fill = Color3.new(1,1,1),
+        size = 13,
+    },
+    distance = {
+        enabled = false,
+        fill = Color3.new(1,1,1),
+        size = 13,
+    },
+    tracer = {
+        enabled = false,
+        fill = Color3.new(1,1,1),
+        outline = Color3.new(0,0,0),
+        from = "mouse", -- mouse, head, top, bottom, center
+    },
+}
 
--- Lighting Event Handlers
-Toggles.AmbientEnabled:OnChanged(function()
-    if Toggles.AmbientEnabled.Value then
-        Lighting.Ambient = Options.AmbientColor1.Value
-        Lighting.OutdoorAmbient = Options.AmbientColor2.Value
-    else
-        Lighting.Ambient = originalLighting.Ambient
-        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+local espinstances = {}
+local espfunctions = {}
+
+-- ESP Functions
+function espfunctions.add_box(instance)
+    if not instance or espinstances[instance] and espinstances[instance].box then return end
+
+    local box = {}
+
+    local outline = Drawing.new("Square")
+    outline.Thickness = 3
+    outline.Filled = false
+    outline.Transparency = 1
+    outline.Visible = false
+
+    local fill = Drawing.new("Square")
+    fill.Thickness = 1
+    fill.Filled = false
+    fill.Transparency = 1
+    fill.Visible = false
+
+    -- ADD THIS: Box fill square
+    local boxFill = Drawing.new("Square")
+    boxFill.Thickness = 1
+    boxFill.Filled = true -- This one IS filled
+    boxFill.Transparency = 0.5
+    boxFill.Visible = false
+
+    box.outline = outline
+    box.fill = fill
+    box.boxFill = boxFill -- ADD THIS LINE
+
+    -- Corner lines code stays the same...
+    box.corner_fill = {}
+    box.corner_outline = {}
+    for i = 1, 8 do
+        local outline = Drawing.new("Line")
+        outline.Thickness = 3
+        outline.Transparency = 1
+        outline.Visible = false
+
+        local fill = Drawing.new("Line")
+        fill.Thickness = 1
+        fill.Transparency = 1
+        fill.Visible = false
+        table.insert(box.corner_fill, fill)
+        table.insert(box.corner_outline, outline)
     end
-end)
 
-Options.AmbientColor1:OnChanged(function()
-    if Toggles.AmbientEnabled.Value then
-        Lighting.Ambient = Options.AmbientColor1.Value
-    end
-end)
+    espinstances[instance] = espinstances[instance] or {}
+    espinstances[instance].box = box
+end
 
-Options.AmbientColor2:OnChanged(function()
-    if Toggles.AmbientEnabled.Value then
-        Lighting.OutdoorAmbient = Options.AmbientColor2.Value
-    end
-end)
+function espfunctions.add_healthbar(instance)
+    if not instance or espinstances[instance] and espinstances[instance].healthbar then return end
+    local outline = Drawing.new("Square")
+    outline.Thickness = 1
+    outline.Filled = true
+    outline.Transparency = 1
 
-Toggles.TimeEnabled:OnChanged(function()
-    if Toggles.TimeEnabled.Value then
-        Lighting.ClockTime = Options.TimeValue.Value
-    else
-        Lighting.ClockTime = originalLighting.ClockTime
-    end
-end)
+    local fill = Drawing.new("Square")
+    fill.Filled = true
+    fill.Transparency = 1
 
-Toggles.BrightnessEnabled:OnChanged(function()
-    if Toggles.BrightnessEnabled.Value then
-        Lighting.Brightness = Options.BrightnessValue.Value
-    else
-        Lighting.Brightness = originalLighting.Brightness
-    end
-end)
+    espinstances[instance] = espinstances[instance] or {}
+    espinstances[instance].healthbar = {
+        outline = outline,
+        fill = fill,
+    }
+end
 
-Toggles.ExposureEnabled:OnChanged(function()
-    if Toggles.ExposureEnabled.Value then
-        Lighting.ExposureCompensation = Options.ExposureValue.Value
-    else
-        Lighting.ExposureCompensation = originalLighting.ExposureCompensation
-    end
-end)
+function espfunctions.add_name(instance)
+    if not instance or espinstances[instance] and espinstances[instance].name then return end
+    local text = Drawing.new("Text")
+    text.Center = true
+    text.Outline = true
+    text.Font = 1
+    text.Transparency = 1
 
-Toggles.FogEnabled:OnChanged(function()
-    if Toggles.FogEnabled.Value then
-        Lighting.FogStart = Options.FogStart.Value
-        Lighting.FogEnd = Options.FogEnd.Value
-        Lighting.FogColor = Options.FogColor.Value
-    else
-        Lighting.FogStart = originalLighting.FogStart
-        Lighting.FogEnd = originalLighting.FogEnd
-        Lighting.FogColor = originalLighting.FogColor
-    end
-end)
+    espinstances[instance] = espinstances[instance] or {}
+    espinstances[instance].name = text
+end
 
-Options.FogColor:OnChanged(function()
-    if Toggles.FogEnabled.Value then
-        Lighting.FogColor = Options.FogColor.Value
-    end
-end)
+function espfunctions.add_distance(instance)
+    if not instance or espinstances[instance] and espinstances[instance].distance then return end
+    local text = Drawing.new("Text")
+    text.Center = true
+    text.Outline = true
+    text.Font = 1
+    text.Transparency = 1
 
-Toggles.TechnologyEnabled:OnChanged(function()
-    if Toggles.TechnologyEnabled.Value then
-        Lighting.Technology = Enum.Technology[Options.TechnologyValue.Value]
-    else
-        Lighting.Technology = originalLighting.Technology
-    end
-end)
+    espinstances[instance] = espinstances[instance] or {}
+    espinstances[instance].distance = text
+end
 
-Options.TechnologyValue:OnChanged(function()
-    if Toggles.TechnologyEnabled.Value then
-        Lighting.Technology = Enum.Technology[Options.TechnologyValue.Value]
-    end
-end)
+function espfunctions.add_tracer(instance)
+    if not instance or espinstances[instance] and espinstances[instance].tracer then return end
+    local outline = Drawing.new("Line")
+    outline.Thickness = 3
+    outline.Transparency = 1
 
-local function setNoClip(state)
-    local character = LocalPlayer.Character
-    if not character then return end
+    local fill = Drawing.new("Line")
+    fill.Thickness = 1
+    fill.Transparency = 1
 
-    for _, part in ipairs(character:GetDescendants()) do
-        if part:IsA("BasePart") and part.CanCollide then
-            part.CanCollide = not state
+    espinstances[instance] = espinstances[instance] or {}
+    espinstances[instance].tracer = {
+        outline = outline,
+        fill = fill,
+    }
+end
+
+-- Functions for ESP Library
+local function get_bounding_box(instance)
+    local min, max = Vector2.new(math.huge, math.huge), Vector2.new(-math.huge, -math.huge)
+    local onscreen = false
+
+    if instance:IsA("Model") then
+        for _, p in ipairs(instance:GetChildren()) do
+            if p:IsA("BasePart") then
+                local size = (p.Size / 2) * esplib.box.padding
+                local cf = p.CFrame
+                for _, offset in ipairs({
+                    Vector3.new( size.X,  size.Y,  size.Z),
+                    Vector3.new(-size.X,  size.Y,  size.Z),
+                    Vector3.new( size.X, -size.Y,  size.Z),
+                    Vector3.new(-size.X, -size.Y,  size.Z),
+                    Vector3.new( size.X,  size.Y, -size.Z),
+                    Vector3.new(-size.X,  size.Y, -size.Z),
+                    Vector3.new( size.X, -size.Y, -size.Z),
+                    Vector3.new(-size.X, -size.Y, -size.Z),
+                }) do
+                    local pos, visible = Camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
+                    if visible then
+                        local v2 = Vector2.new(pos.X, pos.Y)
+                        min = min:Min(v2)
+                        max = max:Max(v2)
+                        onscreen = true
+                    end
+                end
+            elseif p:IsA("Accessory") then
+                local handle = p:FindFirstChild("Handle")
+                if handle and handle:IsA("BasePart") then
+                    local size = (handle.Size / 2) * esplib.box.padding
+                    local cf = handle.CFrame
+                    for _, offset in ipairs({
+                        Vector3.new( size.X,  size.Y,  size.Z),
+                        Vector3.new(-size.X,  size.Y,  size.Z),
+                        Vector3.new( size.X, -size.Y,  size.Z),
+                        Vector3.new(-size.X, -size.Y,  size.Z),
+                        Vector3.new( size.X,  size.Y, -size.Z),
+                        Vector3.new(-size.X,  size.Y, -size.Z),
+                        Vector3.new( size.X, -size.Y, -size.Z),
+                        Vector3.new(-size.X, -size.Y, -size.Z),
+                    }) do
+                        local pos, visible = Camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
+                        if visible then
+                            local v2 = Vector2.new(pos.X, pos.Y)
+                            min = min:Min(v2)
+                            max = max:Max(v2)
+                            onscreen = true
+                        end
+                    end
+                end
+            end
+        end
+    elseif instance:IsA("BasePart") then
+        local size = (instance.Size / 2)
+        local cf = instance.CFrame
+        for _, offset in ipairs({
+            Vector3.new( size.X,  size.Y,  size.Z),
+            Vector3.new(-size.X,  size.Y,  size.Z),
+            Vector3.new( size.X, -size.Y,  size.Z),
+            Vector3.new(-size.X, -size.Y,  size.Z),
+            Vector3.new( size.X,  size.Y, -size.Z),
+            Vector3.new(-size.X,  size.Y, -size.Z),
+            Vector3.new( size.X, -size.Y, -size.Z),
+            Vector3.new(-size.X, -size.Y, -size.Z),
+        }) do
+            local pos, visible = Camera:WorldToViewportPoint(cf:PointToWorldSpace(offset))
+            if visible then
+                local v2 = Vector2.new(pos.X, pos.Y)
+                min = min:Min(v2)
+                max = max:Max(v2)
+                onscreen = true
+            end
         end
     end
+
+    return min, max, onscreen
 end
 
-local function startFlying(rootPart)
-    if bodyVelocity then bodyVelocity:Destroy() end
-    if bodyGyro then bodyGyro:Destroy() end
-    
-    -- Create BodyVelocity for movement
-    bodyVelocity = Instance.new("BodyVelocity")
-    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
-    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
-    bodyVelocity.Parent = rootPart
-    
-    -- Create BodyGyro for rotation
-    bodyGyro = Instance.new("BodyGyro")
-    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
-    bodyGyro.CFrame = rootPart.CFrame
-    bodyGyro.Parent = rootPart
-    
-    flying = true
-end
-
-local function stopFlying()
-    if bodyVelocity then
-        bodyVelocity:Destroy()
-        bodyVelocity = nil
+local function isPlayerVisible(player)
+    if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then
+        return false
     end
-    if bodyGyro then
-        bodyGyro:Destroy()
-        bodyGyro = nil
-    end
-    flying = false
-end
-
--- Function to perform ground detection raycast
-local function getGroundPosition(rootPart)
-    local character = LocalPlayer.Character
-    if not character then return rootPart.Position end
+    
+    local targetRoot = player.Character.HumanoidRootPart
+    local origin = Camera.CFrame.Position
+    local targetPosition = targetRoot.Position
+    local direction = (targetPosition - origin)
     
     local raycastParams = RaycastParams.new()
     raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
-    raycastParams.FilterDescendantsInstances = {character}
     
-    local rayOrigin = rootPart.Position
-    local rayDirection = Vector3.new(0, -100, 0) -- Cast down 100 studs
-    
-    local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
-    
-    if result then
-        -- Return position slightly above ground to prevent clipping
-        return Vector3.new(rootPart.Position.X, result.Position.Y + 3, rootPart.Position.Z)
-    else
-        -- No ground found, maintain current Y position
-        return rootPart.Position
+    local filterList = {LocalPlayer.Character}
+    for _, otherPlayer in pairs(Players:GetPlayers()) do
+        if otherPlayer.Character and otherPlayer ~= player then
+            table.insert(filterList, otherPlayer.Character)
+        end
     end
+    raycastParams.FilterDescendantsInstances = filterList
+    
+    local result = workspace:Raycast(origin, direction, raycastParams)
+    return result == nil or result.Instance:IsDescendantOf(player.Character)
 end
 
--- Free Cam Functions
-local function startFreeCam()
-    if freeCamEnabled then return end
+local function hasForceField(player)
+    return player.Character and player.Character:FindFirstChildOfClass("ForceField") ~= nil
+end
+
+local function isOnSameTeam(player)
+    if not player or not LocalPlayer then return false end
     
-    local character = LocalPlayer.Character
-    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
-    
-    -- Store original camera settings
-    originalCameraType = Camera.CameraType
-    
-    -- Set camera to scriptable
-    Camera.CameraType = Enum.CameraType.Scriptable
-    
-    -- Anchor all character parts to prevent movement
-    anchoredParts = {}
-    for _, part in ipairs(character:GetDescendants()) do
-        if part:IsA("BasePart") and not part.Anchored then
-            part.Anchored = true
-            table.insert(anchoredParts, part)
-        end
+    -- Method 1: Check Team property
+    if player.Team and LocalPlayer.Team then
+        return player.Team == LocalPlayer.Team
     end
     
-    freeCamEnabled = true
-    freeCamKeysDown = {}
-    freeCamRotating = false
+    -- Method 2: Check TeamColor property
+    if player.TeamColor and LocalPlayer.TeamColor then
+        return player.TeamColor == LocalPlayer.TeamColor
+    end
     
-    -- Input handling for FreeCam
-    freeCamInputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
-        if gameProcessed then return end
-        
-        local keyName = tostring(input.KeyCode)
-        local validKeys = {"Enum.KeyCode.W", "Enum.KeyCode.A", "Enum.KeyCode.S", "Enum.KeyCode.D", "Enum.KeyCode.E", "Enum.KeyCode.Q", "Enum.KeyCode.Space", "Enum.KeyCode.LeftControl"}
-        
-        for _, validKey in pairs(validKeys) do
-            if keyName == validKey then
-                freeCamKeysDown[validKey] = true
-                break
-            end
-        end
-        
-        -- Right mouse button for rotation
-        if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            freeCamRotating = true
-        end
-    end)
+    return false
+end
+
+local function isKnocked(player)
+    if not player.Character then return false end
+    local humanoid = player.Character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return false end
     
-    freeCamInputEndConnection = UserInputService.InputEnded:Connect(function(input, gameProcessed)
-        local keyName = tostring(input.KeyCode)
-        
-        for key, _ in pairs(freeCamKeysDown) do
-            if keyName == key then
-                freeCamKeysDown[key] = false
-                break
-            end
-        end
-        
-        -- Right mouse button release
-        if input.UserInputType == Enum.UserInputType.MouseButton2 then
-            freeCamRotating = false
-        end
-    end)
+    -- Check for common knocked states
+    local health = humanoid.Health
     
-    -- Create movement connection
-    freeCamConnection = RunService.RenderStepped:Connect(function()
-        if not freeCamEnabled then return end
-        
-        local speed = Options.FreeCamSpeed.Value / 10 -- Convert to proper speed
-        local sensitivity = 0.3
-        
-        -- Handle rotation with right mouse button
-        if freeCamRotating then
-            local delta = UserInputService:GetMouseDelta()
-            local cf = Camera.CFrame
-            local yAngle = cf:ToEulerAngles(Enum.RotationOrder.YZX)
-            local newAmount = math.deg(yAngle) + delta.Y
-            
-            -- Clamp vertical rotation to prevent flipping
-            if newAmount > 65 or newAmount < -65 then
-                if not (yAngle < 0 and delta.Y < 0) and not (yAngle > 0 and delta.Y > 0) then
-                    delta = Vector2.new(delta.X, 0)
+    -- Method 1: Low health but not dead
+    if health <= 5 and health > 0 then
+        return true
+    end
+    
+    -- Method 2: Check for "Knocked" value (common in many games)
+    local knockedValue = player.Character:FindFirstChild("Knocked") or humanoid:FindFirstChild("Knocked")
+    if knockedValue and knockedValue.Value then
+        return true
+    end
+    
+    -- Method 3: Check humanoid state
+    if humanoid:GetState() == Enum.HumanoidStateType.Dead or 
+       humanoid:GetState() == Enum.HumanoidStateType.Physics then
+        return true
+    end
+    
+    return false
+end
+
+local function shouldRenderESP(player)
+    if player == LocalPlayer or not player.Character then
+        return false
+    end
+    
+    -- Check distance limit
+    local character = player.Character
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return false end
+    
+    local distance = (Camera.CFrame.Position - rootPart.Position).Magnitude
+    if distance > Options.RenderDistance.Value then
+        return false
+    end
+    
+    -- Apply ESP checks based on selected options
+    if selectedChecks["Wallcheck"] and not isPlayerVisible(player) then
+        return false
+    end
+    
+    if selectedChecks["ForceField"] and hasForceField(player) then
+        return false
+    end
+    
+    if selectedChecks["Knocked"] and isKnocked(player) then
+        return false
+    end
+    
+    if selectedChecks["TeamCheck"] and isOnSameTeam(player) then
+        return false
+    end
+    
+    return true
+end
+
+if espRenderConnection then
+    espRenderConnection:Disconnect()
+end
+
+-- ESP Render Loop
+espRenderConnection = RunService.RenderStepped:Connect(function()
+    for instance, data in pairs(espinstances) do
+        if not instance or not instance.Parent then
+            -- Clean up removed instances
+            if data.box then
+                data.box.outline:Remove()
+                data.box.fill:Remove()
+                if data.box.boxFill then data.box.boxFill:Remove() end
+                for _, line in ipairs(data.box.corner_fill) do
+                    line:Remove()
+                end
+                for _, line in ipairs(data.box.corner_outline) do
+                    line:Remove()
                 end
             end
-            
-            -- Apply rotation
-            cf = cf * CFrame.Angles(-math.rad(delta.Y), 0, 0)
-            cf = CFrame.Angles(0, -math.rad(delta.X), 0) * (cf - cf.Position) + cf.Position
-            cf = CFrame.lookAt(cf.Position, cf.Position + cf.LookVector)
-            
-            if delta ~= Vector2.new(0, 0) then
-                Camera.CFrame = Camera.CFrame:Lerp(cf, sensitivity)
+            if data.healthbar then
+                data.healthbar.outline:Remove()
+                data.healthbar.fill:Remove()
             end
-            
-            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
-        else
-            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+            if data.name then
+                data.name:Remove()
+            end
+            if data.distance then
+                data.distance:Remove()
+            end
+            if data.tracer then
+                data.tracer.outline:Remove()
+                data.tracer.fill:Remove()
+            end
+            espinstances[instance] = nil
+            continue
         end
+
+        if instance:IsA("Model") and not instance.PrimaryPart then
+            continue
+        end
+
+        -- Get player from character
+        local player = Players:GetPlayerFromCharacter(instance)
         
-        -- Handle movement
-        if freeCamKeysDown["Enum.KeyCode.W"] then
-            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, 0, -speed))
+        -- Check if ESP should be rendered for this player
+        local shouldRender = true
+        if player then
+            shouldRender = shouldRenderESP(player)
         end
-        if freeCamKeysDown["Enum.KeyCode.A"] then
-            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(-speed, 0, 0))
+
+        local min, max, onscreen = get_bounding_box(instance)
+
+        if data.box then
+            local box = data.box
+
+            if esplib.box.enabled and onscreen and shouldRender then
+                local x, y = min.X, min.Y
+                local w, h = (max - min).X, (max - min).Y
+                local len = math.min(w, h) * 0.25
+
+                -- Render box fill FIRST (so it appears behind the outline)
+                if esplib.box.fillEnabled and box.boxFill then
+                    box.boxFill.Position = min
+                    box.boxFill.Size = max - min
+                    box.boxFill.Color = esplib.box.fillColor
+                    box.boxFill.Transparency = 1 - esplib.box.fillTransparency -- Drawing uses inverted transparency
+                    box.boxFill.Visible = true
+                else
+                    if box.boxFill then box.boxFill.Visible = false end
+                end
+
+                if esplib.box.type == "normal" then
+                    box.outline.Position = min
+                    box.outline.Size = max - min
+                    box.outline.Color = esplib.box.outline
+                    box.outline.Visible = true
+
+                    box.fill.Position = min
+                    box.fill.Size = max - min
+                    box.fill.Color = esplib.box.fill
+                    box.fill.Visible = true
+
+                    for _, line in ipairs(box.corner_fill) do
+                        line.Visible = false
+                    end
+                    for _, line in ipairs(box.corner_outline) do
+                        line.Visible = false
+                    end
+
+                elseif esplib.box.type == "corner" then
+                    local fill_lines = box.corner_fill
+                    local outline_lines = box.corner_outline
+                    local fill_color = esplib.box.fill
+                    local outline_color = esplib.box.outline
+
+                    local corners = {
+                        { Vector2.new(x, y), Vector2.new(x + len, y) },
+                        { Vector2.new(x, y), Vector2.new(x, y + len) },
+
+                        { Vector2.new(x + w - len, y), Vector2.new(x + w, y) },
+                        { Vector2.new(x + w, y), Vector2.new(x + w, y + len) },
+
+                        { Vector2.new(x, y + h), Vector2.new(x + len, y + h) },
+                        { Vector2.new(x, y + h - len), Vector2.new(x, y + h) },
+
+                        { Vector2.new(x + w - len, y + h), Vector2.new(x + w, y + h) },
+                        { Vector2.new(x + w, y + h - len), Vector2.new(x + w, y + h) },
+                    }
+
+                    for i = 1, 8 do
+                        local from, to = corners[i][1], corners[i][2]
+                        local dir = (to - from).Unit
+                        local oFrom = from - dir
+                        local oTo = to + dir
+
+                        local o = outline_lines[i]
+                        o.From = oFrom
+                        o.To = oTo
+                        o.Color = outline_color
+                        o.Visible = true
+
+                        local f = fill_lines[i]
+                        f.From = from
+                        f.To = to
+                        f.Color = fill_color
+                        f.Visible = true
+                    end
+
+                    box.outline.Visible = false
+                    box.fill.Visible = false
+                end
+            else
+                box.outline.Visible = false
+                box.fill.Visible = false
+                if box.boxFill then box.boxFill.Visible = false end
+                for _, line in ipairs(box.corner_fill) do
+                    line.Visible = false
+                end
+                for _, line in ipairs(box.corner_outline) do
+                    line.Visible = false
+                end
+            end
         end
-        if freeCamKeysDown["Enum.KeyCode.S"] then
-            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, 0, speed))
+
+        if data.healthbar then
+            local outline, fill = data.healthbar.outline, data.healthbar.fill
+
+            if not esplib.healthbar.enabled or not onscreen or not shouldRender then
+                outline.Visible = false
+                fill.Visible = false
+            else
+                local humanoid = instance:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    local height = max.Y - min.Y
+                    local padding = 1
+                    local x = min.X - 3 - 1 - padding
+                    local y = min.Y - padding
+                    local health = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
+                    local fillheight = height * health
+
+                    outline.Color = esplib.healthbar.outline
+                    outline.Position = Vector2.new(x, y)
+                    outline.Size = Vector2.new(1 + 2 * padding, height + 2 * padding)
+                    outline.Visible = true
+
+                    fill.Color = esplib.healthbar.fill
+                    fill.Position = Vector2.new(x + padding, y + (height + padding) - fillheight)
+                    fill.Size = Vector2.new(1, fillheight)
+                    fill.Visible = true
+                else
+                    outline.Visible = false
+                    fill.Visible = false
+                end
+            end
         end
-        if freeCamKeysDown["Enum.KeyCode.D"] then
-            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(speed, 0, 0))
+
+        if data.name then
+            if esplib.name.enabled and onscreen and shouldRender then
+                local text = data.name
+                local center_x = (min.X + max.X) / 2
+                local y = min.Y - 15
+
+                local name_str = instance.Name
+                local humanoid = instance:FindFirstChildOfClass("Humanoid")
+                if humanoid then
+                    local player = Players:GetPlayerFromCharacter(instance)
+                    if player then
+                        name_str = player.Name
+                    end
+                end
+
+                text.Text = name_str
+                text.Size = esplib.name.size
+                text.Color = esplib.name.fill
+                text.Position = Vector2.new(center_x, y)
+                text.Visible = true
+            else
+                data.name.Visible = false
+            end
         end
-        if freeCamKeysDown["Enum.KeyCode.E"] or freeCamKeysDown["Enum.KeyCode.Space"] then
-            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, speed, 0))
+
+        if data.distance then
+            if esplib.distance.enabled and onscreen and shouldRender then
+                local text = data.distance
+                local center_x = (min.X + max.X) / 2
+                local y = max.Y + 5
+                local dist
+                if instance:IsA("Model") then
+                    if instance.PrimaryPart then
+                        dist = (Camera.CFrame.Position - instance.PrimaryPart.Position).Magnitude
+                    else
+                        local part = instance:FindFirstChildWhichIsA("BasePart")
+                        if part then
+                            dist = (Camera.CFrame.Position - part.Position).Magnitude
+                        else
+                            dist = 999
+                        end
+                    end
+                else
+                    dist = (Camera.CFrame.Position - instance.Position).Magnitude
+                end
+                text.Text = tostring(math.floor(dist)) .. "m"
+                text.Size = esplib.distance.size
+                text.Color = esplib.distance.fill
+                text.Position = Vector2.new(center_x, y)
+                text.Visible = true
+            else
+                data.distance.Visible = false
+            end
         end
-        if freeCamKeysDown["Enum.KeyCode.Q"] or freeCamKeysDown["Enum.KeyCode.LeftControl"] then
-            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, -speed, 0))
+
+        if data.tracer then
+            if esplib.tracer.enabled and onscreen and shouldRender then
+                local outline, fill = data.tracer.outline, data.tracer.fill
+
+                local from_pos = Vector2.new()
+                local to_pos = Vector2.new()
+
+                if esplib.tracer.from == "mouse" then
+                    local mouse_location = UserInputService:GetMouseLocation()
+                    from_pos = Vector2.new(mouse_location.X, mouse_location.Y)
+                elseif esplib.tracer.from == "top" then
+                    -- FIXED: Actually use the TOP of the screen
+                    from_pos = Vector2.new(Camera.ViewportSize.X/2, 0)
+                elseif esplib.tracer.from == "bottom" then
+                    from_pos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                elseif esplib.tracer.from == "center" then
+                    from_pos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                else
+                    -- Default fallback
+                    from_pos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                end
+
+                to_pos = (min + max) / 2
+
+                outline.From = from_pos
+                outline.To = to_pos
+                outline.Color = esplib.tracer.outline
+                outline.Visible = true
+
+                fill.From = from_pos
+                fill.To = to_pos
+                fill.Color = esplib.tracer.fill
+                fill.Visible = true
+            else
+                data.tracer.outline.Visible = false
+                data.tracer.fill.Visible = false
+            end
         end
+    end
+end)
+
+-- Player Added/Removed Handlers
+local function playerAdded(player)
+    player.CharacterAdded:Connect(function(character)
+        if esplib.box.enabled then espfunctions.add_box(character) end
+        if esplib.healthbar.enabled then espfunctions.add_healthbar(character) end
+        if esplib.name.enabled then espfunctions.add_name(character) end
+        if esplib.distance.enabled then espfunctions.add_distance(character) end
+        if esplib.tracer.enabled then espfunctions.add_tracer(character) end
     end)
+    
+    if player.Character then
+        if esplib.box.enabled then espfunctions.add_box(player.Character) end
+        if esplib.healthbar.enabled then espfunctions.add_healthbar(player.Character) end
+        if esplib.name.enabled then espfunctions.add_name(player.Character) end
+        if esplib.distance.enabled then espfunctions.add_distance(player.Character) end
+        if esplib.tracer.enabled then espfunctions.add_tracer(player.Character) end
+    end
 end
 
-local function stopFreeCam()
-    if not freeCamEnabled then return end
-    
-    -- Disconnect all connections
-    if freeCamConnection then
-        freeCamConnection:Disconnect()
-        freeCamConnection = nil
-    end
-    if freeCamInputConnection then
-        freeCamInputConnection:Disconnect()
-        freeCamInputConnection = nil
-    end
-    if freeCamInputEndConnection then
-        freeCamInputEndConnection:Disconnect()
-        freeCamInputEndConnection = nil
-    end
-    
-    -- Restore camera settings
-    if originalCameraType then
-        Camera.CameraType = originalCameraType
-    end
-    
-    -- Reset mouse behavior
-    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
-    
-    -- Unanchor character parts
-    for _, part in ipairs(anchoredParts) do
-        if part and part.Parent then
-            part.Anchored = false
+local function playerRemoving(player)
+    if espinstances[player.Character] then
+        if espinstances[player.Character].box then
+            espinstances[player.Character].box.outline:Remove()
+            espinstances[player.Character].box.fill:Remove()
+            for _, line in ipairs(espinstances[player.Character].box.corner_fill) do
+                line:Remove()
+            end
+            for _, line in ipairs(espinstances[player.Character].box.corner_outline) do
+                line:Remove()
+            end
         end
+        if espinstances[player.Character].healthbar then
+            espinstances[player.Character].healthbar.outline:Remove()
+            espinstances[player.Character].healthbar.fill:Remove()
+        end
+        if espinstances[player.Character].name then
+            espinstances[player.Character].name:Remove()
+        end
+        if espinstances[player.Character].distance then
+            espinstances[player.Character].distance:Remove()
+        end
+        if espinstances[player.Character].tracer then
+            espinstances[player.Character].tracer.outline:Remove()
+            espinstances[player.Character].tracer.fill:Remove()
+        end
+        espinstances[player.Character] = nil
     end
-    anchoredParts = {}
-    
-    freeCamEnabled = false
-    freeCamRotating = false
-    freeCamKeysDown = {}
 end
 
-RunService.RenderStepped:Connect(function(deltaTime)
-    -- Basic character checks
-    local character = LocalPlayer.Character
-    if not character then return end
-    local humanoid = character:FindFirstChildOfClass("Humanoid")
-    if not humanoid then return end
-    local rootPart = character:FindFirstChild("HumanoidRootPart")
-    if not rootPart then return end
-    
-    local camera = workspace.CurrentCamera
-    local defaultJumpPower = 50
-    local defaultHipHeight = 2.0
+-- Initialize ESP for existing players
+for _, player in ipairs(Players:GetPlayers()) do
+    if player ~= LocalPlayer then
+        playerAdded(player)
+    end
+end
 
-    -- Jump Power (Toggle)
-    if Toggles.JumpPowerEnabled.Value then
-        humanoid.JumpPower = Options.JumpPowerKey:GetState() and Options.JumpPowerValue.Value or defaultJumpPower
+Players.PlayerAdded:Connect(playerAdded)
+Players.PlayerRemoving:Connect(playerRemoving)
+
+-- ESP Toggle Handlers
+Toggles.ESPEnabled:OnChanged(function()
+    if Toggles.ESPEnabled.Value then
+        esplib.box.enabled = Toggles.BoxESP.Value
+        esplib.healthbar.enabled = Toggles.HealthBarESP.Value
+        esplib.name.enabled = Toggles.NameESP.Value
+        esplib.distance.enabled = Toggles.DistanceESP.Value
+        esplib.tracer.enabled = Toggles.TracerESP.Value
+        
+        -- Add ESP to all existing players
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                if esplib.box.enabled then espfunctions.add_box(player.Character) end
+                if esplib.healthbar.enabled then espfunctions.add_healthbar(player.Character) end
+                if esplib.name.enabled then espfunctions.add_name(player.Character) end
+                if esplib.distance.enabled then espfunctions.add_distance(player.Character) end
+                if esplib.tracer.enabled then espfunctions.add_tracer(player.Character) end
+            end
+        end
     else
-        humanoid.JumpPower = defaultJumpPower
-    end
-
-    -- Hip Height (Crouch/Slide)
-    local targetHipHeight = defaultHipHeight
-    if Toggles.HipHeightEnabled.Value and Options.HipHeightKey:GetState() then
-        targetHipHeight = Options.HipHeightValue.Value
-    end
-    humanoid.HipHeight = humanoid.HipHeight + (targetHipHeight - humanoid.HipHeight) * 0.2
-
-    -- Speed Boost
-    if Toggles.SpeedEnabled.Value and Options.SpeedKey:GetState() then
-        local moveVector = Vector3.new()
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector += camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector -= camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector -= camera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector += camera.CFrame.RightVector end
-        
-        if moveVector.Magnitude > 0 then
-            rootPart.Velocity = Vector3.new(
-                moveVector.Unit.X * Options.SpeedValue.Value,
-                rootPart.Velocity.Y,
-                moveVector.Unit.Z * Options.SpeedValue.Value
-            )
-        else
-            rootPart.Velocity = Vector3.new(0, rootPart.Velocity.Y, 0)
+        -- Clear all ESP instances
+        for instance, data in pairs(espinstances) do
+            if data.box then
+                data.box.outline:Remove()
+                data.box.fill:Remove()
+                for _, line in ipairs(data.box.corner_fill) do
+                    line:Remove()
+                end
+                for _, line in ipairs(data.box.corner_outline) do
+                    line:Remove()
+                end
+            end
+            if data.healthbar then
+                data.healthbar.outline:Remove()
+                data.healthbar.fill:Remove()
+            end
+            if data.name then
+                data.name:Remove()
+            end
+            if data.distance then
+                data.distance:Remove()
+            end
+            if data.tracer then
+                data.tracer.outline:Remove()
+                data.tracer.fill:Remove()
+            end
+            espinstances[instance] = nil
         end
     end
+end)
 
-    -- Walk Speed
-    humanoid.WalkSpeed = Toggles.WalkSpeedEnabled.Value and 
-        (Options.WalkSpeedKey:GetState() and Options.WalkSpeedValue.Value or originalWalkSpeed) 
-        or originalWalkSpeed
-
-    -- Fly Mode
-    if Toggles.FlyEnabled.Value and Options.FlyKey:GetState() then
-        if not flying then startFlying(rootPart) end
-        
-        local moveVector = Vector3.new()
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector += camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector -= camera.CFrame.LookVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector -= camera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector += camera.CFrame.RightVector end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVector += Vector3.new(0, 1, 0) end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveVector -= Vector3.new(0, 1, 0) end
-        
-        if bodyVelocity then
-            bodyVelocity.Velocity = moveVector.Unit * Options.FlySpeed.Value
-        end
-        if bodyGyro then
-            bodyGyro.CFrame = CFrame.new(rootPart.Position, rootPart.Position + camera.CFrame.LookVector)
-        end
-        humanoid.PlatformStand = true
-    elseif flying then
-        stopFlying()
-        humanoid.PlatformStand = false
-    end
-
-    -- Bunny Hop
-    if Toggles.BunnyHopEnabled.Value and Options.BunnyHopKey:GetState() then
-        if humanoid.FloorMaterial ~= Enum.Material.Air then
-            humanoid.Jump = true
-            local direction = Vector3.new()
-            if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction -= camera.CFrame.LookVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction -= camera.CFrame.RightVector end
-            if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += camera.CFrame.RightVector end
-            
-            if direction.Magnitude > 0 then
-                rootPart.Velocity = Vector3.new(
-                    direction.Unit.X * Options.BunnyHopspeed.Value,
-                    rootPart.Velocity.Y,
-                    direction.Unit.Z * Options.BunnyHopspeed.Value
-                )
+-- ESP Component Toggles
+Toggles.BoxESP:OnChanged(function()
+    esplib.box.enabled = Toggles.BoxESP.Value and Toggles.ESPEnabled.Value
+    if esplib.box.enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                espfunctions.add_box(player.Character)
             end
         end
     end
+end)
 
-    -- NoClip
-    setNoClip(Toggles.NoClipEnabled.Value and Options.NoClipKey:GetState())
-    
-    -- Free Cam handling
-    if Toggles.FreeCamEnabled.Value and Options.FreeCamKey:GetState() then
-        if not freeCamEnabled then
-            startFreeCam()
-        end
-    else
-        if freeCamEnabled then
-            stopFreeCam()
+Toggles.HealthBarESP:OnChanged(function()
+    esplib.healthbar.enabled = Toggles.HealthBarESP.Value and Toggles.ESPEnabled.Value
+    if esplib.healthbar.enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                espfunctions.add_healthbar(player.Character)
+            end
         end
     end
+end)
+
+Toggles.NameESP:OnChanged(function()
+    esplib.name.enabled = Toggles.NameESP.Value and Toggles.ESPEnabled.Value
+    if esplib.name.enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                espfunctions.add_name(player.Character)
+            end
+        end
+    end
+end)
+
+Toggles.DistanceESP:OnChanged(function()
+    esplib.distance.enabled = Toggles.DistanceESP.Value and Toggles.ESPEnabled.Value
+    if esplib.distance.enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                espfunctions.add_distance(player.Character)
+            end
+        end
+    end
+end)
+
+Toggles.TracerESP:OnChanged(function()
+    esplib.tracer.enabled = Toggles.TracerESP.Value and Toggles.ESPEnabled.Value
+    if esplib.tracer.enabled then
+        for _, player in ipairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer and player.Character then
+                espfunctions.add_tracer(player.Character)
+            end
+        end
+    end
+end)
+
+-- ESP Color and Style Handlers
+Options.BoxESPColor:OnChanged(function()
+    esplib.box.fill = Options.BoxESPColor.Value
+end)
+
+Options.HealthBarColor:OnChanged(function()
+    esplib.healthbar.fill = Options.HealthBarColor.Value
+end)
+
+Options.NameESPColor:OnChanged(function()
+    esplib.name.fill = Options.NameESPColor.Value
+end)
+
+Options.DistanceESPColor:OnChanged(function()
+    esplib.distance.fill = Options.DistanceESPColor.Value
+end)
+
+Options.TracerColor:OnChanged(function()
+    esplib.tracer.fill = Options.TracerColor.Value
+end)
+
+Options.BoxType:OnChanged(function()
+    esplib.box.type = Options.BoxType.Value:lower()
+end)
+
+Options.BoxPadding:OnChanged(function()
+    esplib.box.padding = Options.BoxPadding.Value
+end)
+
+Options.NameSize:OnChanged(function()
+    esplib.name.size = Options.NameSize.Value
+end)
+
+Options.DistanceSize:OnChanged(function()
+    esplib.distance.size = Options.DistanceSize.Value
+end)
+
+Options.TracerOrigin:OnChanged(function()
+    esplib.tracer.from = Options.TracerOrigin.Value:lower()
 end)
 
 -- Key state management
@@ -1239,28 +1670,6 @@ local function shouldAimbotBeActive()
     end
 end
 
--- ESP Variables
-local ESP_Boxes = {}
-local RenderConnection = nil
-
--- R15 body parts list
-local R15Parts = {
-    "Head",
-    "UpperTorso", "LowerTorso",
-    "LeftUpperArm", "LeftLowerArm", "LeftHand",
-    "RightUpperArm", "RightLowerArm", "RightHand",
-    "LeftUpperLeg", "LeftLowerLeg", "LeftFoot",
-    "RightUpperLeg", "RightLowerLeg", "RightFoot"
-}
-
--- R6 body parts list
-local R6Parts = {
-    "Head",
-    "Torso",
-    "Left Arm", "Right Arm",
-    "Left Leg", "Right Leg"
-}
-
 -- Get target part based on rig type and setting
 local function getTargetPart(character)
     local hitbox = Options.TargetHitbox.Value
@@ -1335,7 +1744,6 @@ local function createFOVSystem()
     fovPulseCircle.Filled = false
     fovPulseCircle.Transparency = 0.7
 end
-
 
 local function updateFOVSystem(deltaTime)
     if not fovCircle then createFOVSystem() end
@@ -1832,638 +2240,340 @@ local function stopAimbot()
     stopFOV() -- Also stop FOV system
 end
 
--- ESP System (Chams removed)
-local function shouldShowPlayer(player)
-    if selectedChecks["Wallcheck"] and not isPlayerVisible(player) then
-        return false
+local function setNoClip(state)
+    local character = LocalPlayer.Character
+    if not character then return end
+
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and part.CanCollide then
+            part.CanCollide = not state
+        end
     end
-    
-    if selectedChecks["ForceField"] and hasForceField(player) then
-        return false
-    end
-    
-    if selectedChecks["Knocked"] and isKnocked(player) then
-        return false
-    end
-    
-    if selectedChecks["TeamCheck"] and isOnSameTeam(player) then
-        return false
-    end
-    
-    return true
 end
 
-local function getHealthColor(healthPercent)
-    if healthPercent > 0.75 then
-        local factor = (healthPercent - 0.75) / 0.25
-        return Color3.fromRGB(
-            math.floor(255 * (1 - factor)),
-            255,
-            0
-        )
-    elseif healthPercent > 0.5 then
-        local factor = (healthPercent - 0.5) / 0.25
-        return Color3.fromRGB(
-            255,
-            math.floor(255 * factor),
-            0
-        )
+local function startFlying(rootPart)
+    if bodyVelocity then bodyVelocity:Destroy() end
+    if bodyGyro then bodyGyro:Destroy() end
+    
+    -- Create BodyVelocity for movement
+    bodyVelocity = Instance.new("BodyVelocity")
+    bodyVelocity.MaxForce = Vector3.new(math.huge, math.huge, math.huge)
+    bodyVelocity.Velocity = Vector3.new(0, 0, 0)
+    bodyVelocity.Parent = rootPart
+    
+    -- Create BodyGyro for rotation
+    bodyGyro = Instance.new("BodyGyro")
+    bodyGyro.MaxTorque = Vector3.new(math.huge, math.huge, math.huge)
+    bodyGyro.CFrame = rootPart.CFrame
+    bodyGyro.Parent = rootPart
+    
+    flying = true
+end
+
+local function stopFlying()
+    if bodyVelocity then
+        bodyVelocity:Destroy()
+        bodyVelocity = nil
+    end
+    if bodyGyro then
+        bodyGyro:Destroy()
+        bodyGyro = nil
+    end
+    flying = false
+end
+
+-- Function to perform ground detection raycast
+local function getGroundPosition(rootPart)
+    local character = LocalPlayer.Character
+    if not character then return rootPart.Position end
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {character}
+    
+    local rayOrigin = rootPart.Position
+    local rayDirection = Vector3.new(0, -100, 0) -- Cast down 100 studs
+    
+    local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    
+    if result then
+        -- Return position slightly above ground to prevent clipping
+        return Vector3.new(rootPart.Position.X, result.Position.Y + 3, rootPart.Position.Z)
     else
-        local factor = healthPercent / 0.5
-        return Color3.fromRGB(
-            255,
-            math.floor(100 * factor),
-            0
-        )
+        -- No ground found, maintain current Y position
+        return rootPart.Position
     end
 end
 
-local R15Connections = {
-    -- Head and torso
-    {"Head", "UpperTorso"},
-    {"UpperTorso", "LowerTorso"},
+-- Free Cam Functions
+local function startFreeCam()
+    if freeCamEnabled then return end
     
-    -- Arms
-    {"UpperTorso", "LeftUpperArm"},
-    {"LeftUpperArm", "LeftLowerArm"},
-    {"LeftLowerArm", "LeftHand"},
-    {"UpperTorso", "RightUpperArm"},
-    {"RightUpperArm", "RightLowerArm"},
-    {"RightLowerArm", "RightHand"},
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
     
-    -- Legs
-    {"LowerTorso", "LeftUpperLeg"},
-    {"LeftUpperLeg", "LeftLowerLeg"},
-    {"LeftLowerLeg", "LeftFoot"},
-    {"LowerTorso", "RightUpperLeg"},
-    {"RightUpperLeg", "RightLowerLeg"},
-    {"RightLowerLeg", "RightFoot"}
-}
-
--- R6 bone connections
-local R6Connections = {
-    -- Head and torso
-    {"Head", "Torso"},
+    -- Store original camera settings
+    originalCameraType = Camera.CameraType
     
-    -- Arms
-    {"Torso", "Left Arm"},
-    {"Left Arm", "LeftHand"},
-    {"Torso", "Right Arm"},
-    {"Right Arm", "RightHand"},
+    -- Set camera to scriptable
+    Camera.CameraType = Enum.CameraType.Scriptable
     
-    -- Legs
-    {"Torso", "Left Leg"},
-    {"Left Leg", "LeftFoot"},
-    {"Torso", "Right Leg"},
-    {"Right Leg", "RightFoot"}
-}
-
-local function createSkeletonESP(player)
-    -- Check if player and character exist
-    if not player or not player.Character then return end
-    
-    -- Don't recreate if already exists
-    if Skeleton_Lines[player] then return end
-    
-    Skeleton_Lines[player] = {}
-    
-    -- Verify character exists before proceeding
-    if not player.Character then return end
-    
-    -- Create lines for each bone connection
-    local connections = player.Character:FindFirstChild("UpperTorso") and R15Connections or R6Connections
-    for i = 1, #connections do
-        -- Main line
-        local line = Drawing.new("Line")
-        line.Visible = false
-        line.Thickness = 1
-        line.Color = Color3.new(1, 1, 1)
-        line.Transparency = 1
-        
-        table.insert(Skeleton_Lines[player], line)
+    -- Anchor all character parts to prevent movement
+    anchoredParts = {}
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and not part.Anchored then
+            part.Anchored = true
+            table.insert(anchoredParts, part)
+        end
     end
-end
-
-local function updateSkeletonESP(player)
-    if not Skeleton_Lines[player] or not player.Character then return end
     
-    local connections = player.Character:FindFirstChild("UpperTorso") and R15Connections or R6Connections
-    local color = Options.SkeletonESPColor.Value
+    freeCamEnabled = true
+    freeCamKeysDown = {}
+    freeCamRotating = false
     
-    for i = 1, #connections do
-        local part1 = player.Character:FindFirstChild(connections[i][1])
-        local part2 = player.Character:FindFirstChild(connections[i][2])
+    -- Input handling for FreeCam
+    freeCamInputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
         
-        if part1 and part2 then
-            local pos1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
-            local pos2, onScreen2 = Camera:WorldToViewportPoint(part2.Position)
-            
-            if onScreen1 and onScreen2 then
-                -- Update main line
-                Skeleton_Lines[player][i].From = Vector2.new(pos1.X, pos1.Y)
-                Skeleton_Lines[player][i].To = Vector2.new(pos2.X, pos2.Y)
-                Skeleton_Lines[player][i].Color = color
-                Skeleton_Lines[player][i].Visible = Toggles.SkeletonESP.Value
-            else
-                Skeleton_Lines[player][i].Visible = false
+        local keyName = tostring(input.KeyCode)
+        local validKeys = {"Enum.KeyCode.W", "Enum.KeyCode.A", "Enum.KeyCode.S", "Enum.KeyCode.D", "Enum.KeyCode.E", "Enum.KeyCode.Q", "Enum.KeyCode.Space", "Enum.KeyCode.LeftControl"}
+        
+        for _, validKey in pairs(validKeys) do
+            if keyName == validKey then
+                freeCamKeysDown[validKey] = true
+                break
             end
+        end
+        
+        -- Right mouse button for rotation
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            freeCamRotating = true
+        end
+    end)
+    
+    freeCamInputEndConnection = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+        local keyName = tostring(input.KeyCode)
+        
+        for key, _ in pairs(freeCamKeysDown) do
+            if keyName == key then
+                freeCamKeysDown[key] = false
+                break
+            end
+        end
+        
+        -- Right mouse button release
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            freeCamRotating = false
+        end
+    end)
+    
+    -- Create movement connection
+    freeCamConnection = RunService.RenderStepped:Connect(function()
+        if not freeCamEnabled then return end
+        
+        local speed = Options.FreeCamSpeed.Value / 10 -- Convert to proper speed
+        local sensitivity = 0.3
+        
+        -- Handle rotation with right mouse button
+        if freeCamRotating then
+            local delta = UserInputService:GetMouseDelta()
+            local cf = Camera.CFrame
+            local yAngle = cf:ToEulerAngles(Enum.RotationOrder.YZX)
+            local newAmount = math.deg(yAngle) + delta.Y
+            
+            -- Clamp vertical rotation to prevent flipping
+            if newAmount > 65 or newAmount < -65 then
+                if not (yAngle < 0 and delta.Y < 0) and not (yAngle > 0 and delta.Y > 0) then
+                    delta = Vector2.new(delta.X, 0)
+                end
+            end
+            
+            -- Apply rotation
+            cf = cf * CFrame.Angles(-math.rad(delta.Y), 0, 0)
+            cf = CFrame.Angles(0, -math.rad(delta.X), 0) * (cf - cf.Position) + cf.Position
+            cf = CFrame.lookAt(cf.Position, cf.Position + cf.LookVector)
+            
+            if delta ~= Vector2.new(0, 0) then
+                Camera.CFrame = Camera.CFrame:Lerp(cf, sensitivity)
+            end
+            
+            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
         else
-            Skeleton_Lines[player][i].Visible = false
+            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
         end
-    end
-end
-
-local function cleanupSkeletonESP(player)
-    if Skeleton_Lines[player] then
-        for _, line in ipairs(Skeleton_Lines[player]) do
-            line:Remove()
+        
+        -- Handle movement
+        if freeCamKeysDown["Enum.KeyCode.W"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, 0, -speed))
         end
-        Skeleton_Lines[player] = nil
-    end
-end
-
-local function getPlayerWeapon(player)
-    if not player.Character then return nil end
-    
-    -- Check for tool in character
-    for _, child in ipairs(player.Character:GetChildren()) do
-        if child:IsA("Tool") then
-            return child.Name
+        if freeCamKeysDown["Enum.KeyCode.A"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(-speed, 0, 0))
         end
-    end
-    
-    -- Check for tool in backpack
-    local backpack = player:FindFirstChild("Backpack")
-    if backpack then
-        for _, tool in ipairs(backpack:GetChildren()) do
-            if tool:IsA("Tool") then
-                return tool.Name
-            end
+        if freeCamKeysDown["Enum.KeyCode.S"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, 0, speed))
         end
-    end
-    
-    return nil
-end
-
-local function newBoxSet()
-    local outline = Drawing.new("Square")
-    outline.Visible = false
-    outline.Color = Color3.fromRGB(0, 0, 0)
-    outline.Thickness = 1
-    outline.Filled = false
-
-    local box = Drawing.new("Square")
-    box.Visible = false
-    box.Color = Color3.fromRGB(255, 0, 0)
-    box.Thickness = 1
-    box.Filled = false
-
-    local inline = Drawing.new("Square")
-    inline.Visible = false
-    inline.Color = Color3.fromRGB(0, 0, 0)
-    inline.Thickness = 1
-    inline.Filled = false
-
-    local healthBarOutline = Drawing.new("Square")
-    healthBarOutline.Visible = false
-    healthBarOutline.Color = Color3.fromRGB(0, 0, 0)
-    healthBarOutline.Thickness = 1
-    healthBarOutline.Filled = false
-
-    local healthBarBg = Drawing.new("Square")
-    healthBarBg.Visible = false
-    healthBarBg.Color = Color3.fromRGB(25, 25, 25)
-    healthBarBg.Thickness = 0
-    healthBarBg.Filled = true
-
-    local healthBar = Drawing.new("Square")
-    healthBar.Visible = false
-    healthBar.Color = Color3.fromRGB(0, 255, 0)
-    healthBar.Thickness = 0
-    healthBar.Filled = true
-
-    local nameText = Drawing.new("Text")
-    nameText.Visible = false
-    nameText.Color = Color3.fromRGB(255, 255, 255)
-    nameText.Size = 16
-    nameText.Center = true
-    nameText.Outline = true
-    nameText.OutlineColor = Color3.fromRGB(0, 0, 0)
-    nameText.Font = Drawing.Fonts.UI
-
-    local distanceText = Drawing.new("Text")
-    distanceText.Visible = false
-    distanceText.Color = Color3.fromRGB(200, 200, 200)
-    distanceText.Size = 14
-    distanceText.Center = true
-    distanceText.Outline = true
-    distanceText.OutlineColor = Color3.fromRGB(0, 0, 0)
-    distanceText.Font = Drawing.Fonts.UI
-
-    -- New tracer ESP components
-    local tracerOutline = Drawing.new("Line")
-    tracerOutline.Visible = false
-    tracerOutline.Color = Color3.fromRGB(0, 0, 0)
-    tracerOutline.Thickness = 3
-    tracerOutline.Transparency = 1
-
-    local tracerLine = Drawing.new("Line")
-    tracerLine.Visible = false
-    tracerLine.Color = Color3.fromRGB(255, 255, 255)
-    tracerLine.Thickness = 1
-    tracerLine.Transparency = 1
-
-    -- New weapon ESP text
-    local weaponText = Drawing.new("Text")
-    weaponText.Visible = false
-    weaponText.Color = Color3.fromRGB(255, 128, 0)
-    weaponText.Size = 14
-    weaponText.Center = true
-    weaponText.Outline = true
-    weaponText.OutlineColor = Color3.fromRGB(0, 0, 0)
-    weaponText.Font = Drawing.Fonts.UI
-
-    return { 
-        Box = box, 
-        Outline = outline, 
-        Inline = inline, 
-        HealthBarOutline = healthBarOutline,
-        HealthBarBg = healthBarBg,
-        HealthBar = healthBar,
-        NameText = nameText,
-        DistanceText = distanceText,
-        TracerOutline = tracerOutline,
-        TracerLine = tracerLine,
-        WeaponText = weaponText
-    }
-end
-
-local function cleanupESP(player)
-    -- Cleanup drawing boxes
-    if ESP_Boxes[player] then
-        ESP_Boxes[player].Box:Remove()
-        ESP_Boxes[player].Outline:Remove()
-        ESP_Boxes[player].Inline:Remove()
-        ESP_Boxes[player].HealthBarOutline:Remove()
-        ESP_Boxes[player].HealthBarBg:Remove()
-        ESP_Boxes[player].HealthBar:Remove()
-        ESP_Boxes[player].NameText:Remove()
-        ESP_Boxes[player].DistanceText:Remove()
-        ESP_Boxes[player].TracerOutline:Remove()
-        ESP_Boxes[player].TracerLine:Remove()
-        ESP_Boxes[player].WeaponText:Remove()
-        ESP_Boxes[player] = nil
-    end
-    
-    cleanupSkeletonESP(player)
-end
-
-Players.PlayerRemoving:Connect(function(player)
-    cleanupESP(player)
-end)
-
-local function getPartCorners(part)
-    local size = part.Size / 2
-    local cf = part.CFrame
-    return {
-        (cf * CFrame.new(-size.X, -size.Y, -size.Z)).Position,
-        (cf * CFrame.new(-size.X, -size.Y,  size.Z)).Position,
-        (cf * CFrame.new(-size.X,  size.Y, -size.Z)).Position,
-        (cf * CFrame.new(-size.X,  size.Y,  size.Z)).Position,
-        (cf * CFrame.new( size.X, -size.Y, -size.Z)).Position,
-        (cf * CFrame.new( size.X, -size.Y,  size.Z)).Position,
-        (cf * CFrame.new( size.X,  size.Y, -size.Z)).Position,
-        (cf * CFrame.new( size.X,  size.Y,  size.Z)).Position
-    }
-end
-
-local function getCharacterBounds(character)
-    local minX, minY = math.huge, math.huge
-    local maxX, maxY = -math.huge, -math.huge
-    local onScreenAny = false
-    
-    local isR15 = character:FindFirstChild("UpperTorso") ~= nil
-    local parts = isR15 and R15Parts or R6Parts
-
-    for _, partName in ipairs(parts) do
-        local part = character:FindFirstChild(partName)
-        if part and part:IsA("BasePart") then
-            for _, corner in ipairs(getPartCorners(part)) do
-                local pos, onScreen = Camera:WorldToViewportPoint(corner)
-                if onScreen then
-                    onScreenAny = true
-                    minX = math.min(minX, pos.X)
-                    maxX = math.max(maxX, pos.X)
-                    minY = math.min(minY, pos.Y)
-                    maxY = math.max(maxY, pos.Y)
-                end
-            end
+        if freeCamKeysDown["Enum.KeyCode.D"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(speed, 0, 0))
         end
-    end
-
-    if not onScreenAny then
-        return nil
-    end
-
-    return Vector2.new(minX, minY), Vector2.new(maxX, maxY)
-end
-
-local function hideESP(data)
-    data.Box.Visible = false
-    data.Outline.Visible = false
-    data.Inline.Visible = false
-    data.HealthBarOutline.Visible = false
-    data.HealthBarBg.Visible = false
-    data.HealthBar.Visible = false
-    data.NameText.Visible = false
-    data.DistanceText.Visible = false
-    data.TracerOutline.Visible = false
-    data.TracerLine.Visible = false
-    data.WeaponText.Visible = false
-end
-
-local function addESP(player)
-    -- Skip local player and existing ESP
-    if player == LocalPlayer or ESP_Boxes[player] then return end
-    
-    -- Only proceed if player has a character
-    if not player.Character then
-        -- Set up a connection to wait for character
-        local connection
-        connection = player.CharacterAdded:Connect(function(char)
-            connection:Disconnect()
-            ESP_Boxes[player] = newBoxSet()
-            createSkeletonESP(player)
-        end)
-        return
-    end
-    
-    -- If character already exists
-    ESP_Boxes[player] = newBoxSet()
-    createSkeletonESP(player)
-
-    -- Cleanup when player leaves
-    player.AncestryChanged:Connect(function(_, parent)
-        if not parent then
-            cleanupESP(player)
-            cleanupSkeletonESP(player)
+        if freeCamKeysDown["Enum.KeyCode.E"] or freeCamKeysDown["Enum.KeyCode.Space"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, speed, 0))
+        end
+        if freeCamKeysDown["Enum.KeyCode.Q"] or freeCamKeysDown["Enum.KeyCode.LeftControl"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, -speed, 0))
         end
     end)
 end
 
-local function startESP()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        addESP(plr)
+local function stopFreeCam()
+    if not freeCamEnabled then return end
+    
+    -- Disconnect all connections
+    if freeCamConnection then
+        freeCamConnection:Disconnect()
+        freeCamConnection = nil
     end
-
-    Players.PlayerAdded:Connect(addESP)
-
-    RenderConnection = RunService.RenderStepped:Connect(function()
-        local espEnabled = Toggles.ESPEnabled.Value
-        local boxEnabled = Toggles.BoxESP.Value
-        local healthEnabled = Toggles.HealthBarESP.Value
-        local nameEnabled = Toggles.NameESP.Value
-        local distanceEnabled = Toggles.DistanceESP.Value
-        local skeletonEnabled = Toggles.SkeletonESP.Value
-        local tracerEnabled = Toggles.TracerESP.Value
-        local weaponEnabled = Toggles.WeaponESP.Value
-        local boxColor = Options.BoxESPColor.Value
-        local nameColor = Options.NameESPColor.Value
-        local distanceColor = Options.DistanceESPColor.Value
-        local skeletonColor = Options.SkeletonESPColor.Value
-        local tracerColor = Options.TracerColor.Value
-        local weaponColor = Options.WeaponColor.Value
-        local tracerOrigin = Options.TracerOrigin.Value
-
-        for player, data in pairs(ESP_Boxes) do
-            if not player.Parent or player == LocalPlayer then
-                hideESP(data)
-                if Skeleton_Lines[player] then
-                    cleanupSkeletonESP(player)
-                end
-                continue
-            end
-            
-            local char = player.Character
-            if not char or not char.Parent then
-                hideESP(data)
-                if Skeleton_Lines[player] then
-                    cleanupSkeletonESP(player)
-                end
-                continue
-            end
-
-            -- Continue with regular ESP logic only if ESP is enabled
-            if not espEnabled then
-                hideESP(data)
-                if Skeleton_Lines[player] then
-                    cleanupSkeletonESP(player)
-                end
-                continue
-            end
-
-            if not shouldShowPlayer(player) then
-                hideESP(data)
-                if Skeleton_Lines[player] then
-                    cleanupSkeletonESP(player)
-                end
-                continue
-            end
-
-            local minVec, maxVec = getCharacterBounds(char)
-            if minVec and maxVec then
-                local width = maxVec.X - minVec.X
-                local height = maxVec.Y - minVec.Y
-
-                if width > 0 and height > 0 and width < 1000 and height < 1000 then
-                    local distance = 0
-                    if distanceEnabled and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                        local localPos = LocalPlayer.Character.HumanoidRootPart.Position
-                        local targetPos = char:FindFirstChild("HumanoidRootPart")
-                        if targetPos then
-                            distance = math.floor((localPos - targetPos.Position).Magnitude)
-                        end
-                    end
-
-                    if boxEnabled then
-                        data.Outline.Size = Vector2.new(width + 2, height + 2)
-                        data.Outline.Position = Vector2.new(minVec.X - 1, minVec.Y - 1)
-                        data.Outline.Visible = true
-
-                        data.Box.Size = Vector2.new(width, height)
-                        data.Box.Position = Vector2.new(minVec.X, minVec.Y)
-                        data.Box.Color = boxColor
-                        data.Box.Visible = true
-
-                        data.Inline.Size = Vector2.new(width - 2, height - 2)
-                        data.Inline.Position = Vector2.new(minVec.X + 1, minVec.Y + 1)
-                        data.Inline.Visible = true
-                    else
-                        data.Box.Visible = false
-                        data.Outline.Visible = false
-                        data.Inline.Visible = false
-                    end
-
-                    if nameEnabled then
-                        data.NameText.Text = player.DisplayName or player.Name
-                        data.NameText.Color = nameColor
-                        data.NameText.Position = Vector2.new(minVec.X + width/2, minVec.Y - 20)
-                        data.NameText.Visible = true
-                    else
-                        data.NameText.Visible = false
-                    end
-
-                    if distanceEnabled then
-    data.DistanceText.Text = tostring(distance) .. " studs"
-    data.DistanceText.Color = distanceColor
-    -- Position distance text below weapon text (add 15 pixels below box if no weapon, or below weapon if present)
-    local yOffset = weaponEnabled and data.WeaponText.Visible and 17 or 2
-    data.DistanceText.Position = Vector2.new(minVec.X + width/2, maxVec.Y + yOffset)
-    data.DistanceText.Visible = true
-else
-    data.DistanceText.Visible = false
+    if freeCamInputConnection then
+        freeCamInputConnection:Disconnect()
+        freeCamInputConnection = nil
+    end
+    if freeCamInputEndConnection then
+        freeCamInputEndConnection:Disconnect()
+        freeCamInputEndConnection = nil
+    end
+    
+    -- Restore camera settings
+    if originalCameraType then
+        Camera.CameraType = originalCameraType
+    end
+    
+    -- Reset mouse behavior
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    
+    -- Unanchor character parts
+    for _, part in ipairs(anchoredParts) do
+        if part and part.Parent then
+            part.Anchored = false
+        end
+    end
+    anchoredParts = {}
+    
+    freeCamEnabled = false
+    freeCamRotating = false
+    freeCamKeysDown = {}
 end
 
-                    -- Weapon ESP (positioned between box and distance)
-                    if weaponEnabled then
-            local weapon = getPlayerWeapon(player)
-         if weapon then
-        data.WeaponText.Text = weapon
-        data.WeaponText.Color = weaponColor
-        -- Position weapon text just below the box
-        data.WeaponText.Position = Vector2.new(minVec.X + width/2, maxVec.Y + 2)
-        data.WeaponText.Visible = true
+RunService.RenderStepped:Connect(function(deltaTime)
+    -- Basic character checks
+    local character = LocalPlayer.Character
+    if not character then return end
+    local humanoid = character:FindFirstChildOfClass("Humanoid")
+    if not humanoid then return end
+    local rootPart = character:FindFirstChild("HumanoidRootPart")
+    if not rootPart then return end
+    
+    local camera = workspace.CurrentCamera
+    local defaultJumpPower = 50
+    local defaultHipHeight = 3.0
+
+    -- Jump Power (Toggle)
+    if Toggles.JumpPowerEnabled.Value then
+        humanoid.JumpPower = Options.JumpPowerKey:GetState() and Options.JumpPowerValue.Value or defaultJumpPower
     else
-        data.WeaponText.Visible = false
+        humanoid.JumpPower = defaultJumpPower
     end
-else
-    data.WeaponText.Visible = false
-end
 
-                    if healthEnabled then
-                        local humanoid = char:FindFirstChildOfClass("Humanoid")
-                        if humanoid and humanoid.MaxHealth > 0 then
-                            local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                            local barWidth = 4
-                            local barHeight = height
-                            
-                            data.HealthBarOutline.Size = Vector2.new(barWidth + 1, barHeight + 1)
-                            data.HealthBarOutline.Position = Vector2.new(minVec.X - barWidth - 3.5, minVec.Y - 0.5)
-                            data.HealthBarOutline.Visible = true
-                            
-                            data.HealthBarBg.Size = Vector2.new(barWidth, barHeight)
-                            data.HealthBarBg.Position = Vector2.new(minVec.X - barWidth - 3, minVec.Y)
-                            data.HealthBarBg.Visible = true
-                            
-                            local fillHeight = math.max(1, barHeight * healthPercent)
-                            data.HealthBar.Size = Vector2.new(barWidth - 1, fillHeight)
-                            data.HealthBar.Position = Vector2.new(minVec.X - barWidth - 2.5, minVec.Y + (barHeight - fillHeight))
-                            data.HealthBar.Color = getHealthColor(healthPercent)
-                            data.HealthBar.Visible = true
-                        else
-                            data.HealthBarOutline.Visible = false
-                            data.HealthBarBg.Visible = false
-                            data.HealthBar.Visible = false
-                        end
-                    else
-                        data.HealthBarOutline.Visible = false
-                        data.HealthBarBg.Visible = false
-                        data.HealthBar.Visible = false
-                    end
+    -- Hip Height (Crouch/Slide)
+    local targetHipHeight = defaultHipHeight
+    if Toggles.HipHeightEnabled.Value and Options.HipHeightKey:GetState() then
+        targetHipHeight = Options.HipHeightValue.Value
+    end
 
-                    -- Tracer ESP
-                    if tracerEnabled then
-                        -- Get target position (bottom of box)
-                        local targetPos = Vector2.new(minVec.X + width/2, maxVec.Y)
-                        
-                        -- Get origin position based on setting
-                        local originPos
-                        if tracerOrigin == "Top" then
-                            originPos = Vector2.new(Camera.ViewportSize.X/2, 0)
-                        elseif tracerOrigin == "Middle" then
-                            originPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
-                        elseif tracerOrigin == "Bottom" then
-                            originPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
-                        else -- Mouse
-                            originPos = UserInputService:GetMouseLocation()
-                        end
-                        
-                        -- Update tracer line
-                        data.TracerOutline.From = originPos
-                        data.TracerOutline.To = targetPos
-                        data.TracerOutline.Visible = true
-                        
-                        data.TracerLine.From = originPos
-                        data.TracerLine.To = targetPos
-                        data.TracerLine.Color = tracerColor
-                        data.TracerLine.Visible = true
-                    else
-                        data.TracerOutline.Visible = false
-                        data.TracerLine.Visible = false
-                    end
+    if Toggles.HipHeightEnabled.Value then
+        humanoid.HipHeight = humanoid.HipHeight + (targetHipHeight - humanoid.HipHeight) * 0.2
+    end
 
-                    -- Skeleton ESP
-                    if skeletonEnabled then
-                        -- Initialize skeleton if not exists
-                        if not Skeleton_Lines[player] then
-                            createSkeletonESP(player)
-                        end
-                        
-                        -- Update skeleton
-                        local connections = char:FindFirstChild("UpperTorso") and R15Connections or R6Connections
-                        
-                        for i = 1, #connections do
-                            local part1 = char:FindFirstChild(connections[i][1])
-                            local part2 = char:FindFirstChild(connections[i][2])
-                            
-                            if part1 and part2 then
-                                local pos1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
-                                local pos2, onScreen2 = Camera:WorldToViewportPoint(part2.Position)
-                                
-                                if onScreen1 and onScreen2 then
-                                    -- Update main line
-                                    Skeleton_Lines[player][i].From = Vector2.new(pos1.X, pos1.Y)
-                                    Skeleton_Lines[player][i].To = Vector2.new(pos2.X, pos2.Y)
-                                    Skeleton_Lines[player][i].Color = skeletonColor
-                                    Skeleton_Lines[player][i].Visible = true
-                                else
-                                    Skeleton_Lines[player][i].Visible = false
-                                end
-                            else
-                                Skeleton_Lines[player][i].Visible = false
-                            end
-                        end
-                    else
-                        if Skeleton_Lines[player] then
-                            cleanupSkeletonESP(player)
-                        end
-                    end
-                else
-                    hideESP(data)
-                    if Skeleton_Lines[player] then
-                        cleanupSkeletonESP(player)
-                    end
-                end
-            else
-                hideESP(data)
-                if Skeleton_Lines[player] then
-                    cleanupSkeletonESP(player)
-                end
+    -- Speed Boost
+    if Toggles.SpeedEnabled.Value and Options.SpeedKey:GetState() then
+        local moveVector = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector += camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector -= camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector -= camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector += camera.CFrame.RightVector end
+        
+        if moveVector.Magnitude > 0 then
+            rootPart.Velocity = Vector3.new(
+                moveVector.Unit.X * Options.SpeedValue.Value,
+                rootPart.Velocity.Y,
+                moveVector.Unit.Z * Options.SpeedValue.Value
+            )
+        else
+            rootPart.Velocity = Vector3.new(0, rootPart.Velocity.Y, 0)
+        end
+    end
+
+    -- Walk Speed
+    humanoid.WalkSpeed = Toggles.WalkSpeedEnabled.Value and 
+        (Options.WalkSpeedKey:GetState() and Options.WalkSpeedValue.Value or originalWalkSpeed) 
+        or originalWalkSpeed
+
+    -- Fly Mode
+    if Toggles.FlyEnabled.Value and Options.FlyKey:GetState() then
+        if not flying then startFlying(rootPart) end
+        
+        local moveVector = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector += camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector -= camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector -= camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector += camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVector += Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveVector -= Vector3.new(0, 1, 0) end
+        
+        if bodyVelocity then
+            bodyVelocity.Velocity = moveVector.Unit * Options.FlySpeed.Value
+        end
+        if bodyGyro then
+            bodyGyro.CFrame = CFrame.new(rootPart.Position, rootPart.Position + camera.CFrame.LookVector)
+        end
+        humanoid.PlatformStand = true
+    elseif flying then
+        stopFlying()
+        humanoid.PlatformStand = false
+    end
+
+    -- Bunny Hop
+    if Toggles.BunnyHopEnabled.Value and Options.BunnyHopKey:GetState() then
+        if humanoid.FloorMaterial ~= Enum.Material.Air then
+            humanoid.Jump = true
+            local direction = Vector3.new()
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction -= camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction -= camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += camera.CFrame.RightVector end
+            
+            if direction.Magnitude > 0 then
+                rootPart.Velocity = Vector3.new(
+                    direction.Unit.X * Options.BunnyHopspeed.Value,
+                    rootPart.Velocity.Y,
+                    direction.Unit.Z * Options.BunnyHopspeed.Value
+                )
             end
         end
-    end)
-end
+    end
 
-local function stopESP()
-    if RenderConnection then
-        RenderConnection:Disconnect()
-        RenderConnection = nil
-    end
+    -- NoClip
+    setNoClip(Toggles.NoClipEnabled.Value and Options.NoClipKey:GetState())
     
-    for player, _ in pairs(ESP_Boxes) do
-        cleanupESP(player)
+    -- Free Cam handling
+    if Toggles.FreeCamEnabled.Value and Options.FreeCamKey:GetState() then
+        if not freeCamEnabled then
+            startFreeCam()
+        end
+    else
+        if freeCamEnabled then
+            stopFreeCam()
+        end
     end
-end
+end)
 
 Options.FOVPulseDirection:OnChanged(function(value)
     pulseDirection = value
@@ -2472,14 +2582,6 @@ Options.FOVPulseDirection:OnChanged(function(value)
 end)
 
 -- UI Event Handlers
-Toggles.ESPEnabled:OnChanged(function()
-    if Toggles.ESPEnabled.Value then
-        startESP()
-    else
-        stopESP()
-    end
-end)
-
 Toggles.AimbotEnabled:OnChanged(function()
     if Toggles.AimbotEnabled.Value then
         startAimbot()
@@ -2507,6 +2609,85 @@ Toggles.CrosshairVisible:OnChanged(function()
         startCrosshair()
     else
         stopCrosshair()
+    end
+end)
+
+-- Lighting Event Handlers
+Toggles.AmbientEnabled:OnChanged(function()
+    if Toggles.AmbientEnabled.Value then
+        Lighting.Ambient = Options.AmbientColor1.Value
+        Lighting.OutdoorAmbient = Options.AmbientColor2.Value
+    else
+        Lighting.Ambient = originalLighting.Ambient
+        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+    end
+end)
+
+Options.AmbientColor1:OnChanged(function()
+    if Toggles.AmbientEnabled.Value then
+        Lighting.Ambient = Options.AmbientColor1.Value
+    end
+end)
+
+Options.AmbientColor2:OnChanged(function()
+    if Toggles.AmbientEnabled.Value then
+        Lighting.OutdoorAmbient = Options.AmbientColor2.Value
+    end
+end)
+
+Toggles.TimeEnabled:OnChanged(function()
+    if Toggles.TimeEnabled.Value then
+        Lighting.ClockTime = Options.TimeValue.Value
+    else
+        Lighting.ClockTime = originalLighting.ClockTime
+    end
+end)
+
+Toggles.BrightnessEnabled:OnChanged(function()
+    if Toggles.BrightnessEnabled.Value then
+        Lighting.Brightness = Options.BrightnessValue.Value
+    else
+        Lighting.Brightness = originalLighting.Brightness
+    end
+end)
+
+Toggles.ExposureEnabled:OnChanged(function()
+    if Toggles.ExposureEnabled.Value then
+        Lighting.ExposureCompensation = Options.ExposureValue.Value
+    else
+        Lighting.ExposureCompensation = originalLighting.ExposureCompensation
+    end
+end)
+
+Toggles.FogEnabled:OnChanged(function()
+    if Toggles.FogEnabled.Value then
+        Lighting.FogStart = Options.FogStart.Value
+        Lighting.FogEnd = Options.FogEnd.Value
+        Lighting.FogColor = Options.FogColor.Value
+    else
+        Lighting.FogStart = originalLighting.FogStart
+        Lighting.FogEnd = originalLighting.FogEnd
+        Lighting.FogColor = originalLighting.FogColor
+    end
+end)
+
+Options.FogColor:OnChanged(function()
+    if Toggles.FogEnabled.Value then
+        Lighting.FogColor = Options.FogColor.Value
+    end
+end)
+
+Toggles.TechnologyEnabled:OnChanged(function()
+    if Toggles.TechnologyEnabled.Value then
+        Lighting.Technology = Enum.Technology[Options.TechnologyValue.Value]
+    else
+        Lighting.Technology = originalLighting.Technology
+    end
+end)
+
+Options.TechnologyValue:OnChanged(function()
+    if Toggles.TechnologyEnabled.Value then
+        Lighting.Technology = Enum.Technology[Options.TechnologyValue.Value]
     end
 end)
 
