@@ -24,24 +24,89 @@ local LeftGroupBox1 = Tabs.Main1:AddLeftGroupbox('Aimbot')
 local LeftGroupBox2 = Tabs.Main1:AddLeftGroupbox('Field of View')
 local ManipulationGroup = Tabs.Rage:AddLeftGroupbox('Manipulation')
 local LeftGroupBox = Tabs.Main:AddLeftGroupbox('Player Visuals')
+local LightingGroup = Tabs.Main:AddLeftGroupbox('Lighting')
 local CrosshairGroup = Tabs.Main:AddRightGroupbox('Crosshair')
+local MiscGroup = Tabs.Rage:AddRightGroupbox('Misc')
+-- Services
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local Lighting = game:GetService("Lighting")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local LocalPlayer = Players.LocalPlayer
+
+-- Store original lighting values
+local originalLighting = {
+    Ambient = Lighting.Ambient,
+    OutdoorAmbient = Lighting.OutdoorAmbient,
+    ClockTime = Lighting.ClockTime,
+    Brightness = Lighting.Brightness,
+    ExposureCompensation = Lighting.ExposureCompensation,
+    FogStart = Lighting.FogStart,
+    FogEnd = Lighting.FogEnd,
+    FogColor = Lighting.FogColor
+}
+
+-- Store original walk speed
+local originalWalkSpeed = 16
 
 ManipulationGroup:AddToggle('SpeedEnabled', {
-    Text = 'Speed',
+    Text = 'Velocity Speed',
     Default = false,
 }):AddKeyPicker('SpeedKey', {
     Default = 'LeftShift', -- example
     SyncToggleState = false,
     Mode = 'Hold',
-    Text = 'Speed Key',
+    Text = 'CFrame Speed Key',
     NoUI = false
 })
 
 ManipulationGroup:AddSlider('SpeedValue', {
-    Text = 'Speed Value',
+    Text = 'CFrame Speed Value',
     Default = 50,
     Min = 16,
-    Max = 300,
+    Max = 1500,
+    Rounding = 0,
+    Compact = false,
+})
+
+ManipulationGroup:AddToggle('WalkSpeedEnabled', {
+    Text = 'Walk Speed',
+    Default = false,
+}):AddKeyPicker('WalkSpeedKey', {
+    Default = 'T',
+    SyncToggleState = false,
+    Mode = 'Hold',
+    Text = 'Walk Speed Key',
+    NoUI = false
+})
+
+ManipulationGroup:AddSlider('WalkSpeedValue', {
+    Text = 'Walk Speed Value',
+    Default = 50,
+    Min = 1,
+    Max = 1500,
+    Rounding = 0,
+    Compact = false,
+})
+
+ManipulationGroup:AddToggle('JumpPowerEnabled', {
+    Text = 'Jump Power',
+    Default = false,
+    Tooltip = 'Modify jump height',
+}):AddKeyPicker('JumpPowerKey', {
+    Default = 'Space', -- Default to spacebar
+    SyncToggleState = false,
+    Mode = 'Toggle',
+    Text = 'Jump Power Key',
+    NoUI = false
+})
+
+ManipulationGroup:AddSlider('JumpPowerValue', {
+    Text = 'Jump Power Value',
+    Default = 50, -- Default jump power
+    Min = 0,
+    Max = 200,
     Rounding = 0,
     Compact = false,
 })
@@ -96,6 +161,27 @@ ManipulationGroup:AddSlider('BunnyHopspeed', {
     Min = 1,
     Max = 300,
     Rounding = 0,
+    Compact = false,
+})
+
+ManipulationGroup:AddToggle('HipHeightEnabled', {
+    Text = 'Hipheight',
+    Default = false,
+    Tooltip = 'Hipheight',
+}):AddKeyPicker('HipHeightKey', {
+    Default = 'LeftControl',
+    SyncToggleState = false,
+    Mode = 'Hold',
+    Text = 'Crouch Key',
+    NoUI = false
+})
+
+ManipulationGroup:AddSlider('HipHeightValue', {
+    Text = 'Crouch Height',
+    Default = 2, -- Better default value
+    Min = 2, -- Minimum safe value
+    Max = 50,
+    Rounding = 1,
     Compact = false,
 })
 
@@ -189,6 +275,29 @@ LeftGroupBox2:AddToggle('FOVEnabled', {
     Title = 'FOV Color',
 })
 
+LeftGroupBox2:AddToggle('FOVPulseEnabled', {
+    Text = 'Pulse Effect',
+    Default = false,
+    Tooltip = 'Adds a pulsing effect to the FOV circle',
+})
+
+LeftGroupBox2:AddSlider('FOVPulseSpeed', {
+    Text = 'Pulse Speed',
+    Default = 1,
+    Min = 0.1,
+    Max = 5,
+    Rounding = 1,
+    Compact = false,
+})
+
+LeftGroupBox2:AddDropdown('FOVPulseDirection', {
+    Values = { 'Outward', 'Inward' },
+    Default = 1,
+    Multi = false,
+    Text = 'Pulse Direction',
+    Tooltip = 'Direction of the pulse effect',
+})
+
 LeftGroupBox2:AddSlider('FOVRadius', {
     Text = 'FOV Radius',
     Default = 100,
@@ -228,6 +337,15 @@ LeftGroupBox:AddToggle('BoxESP', {
     Title = 'Box ESP Color',
 })
 
+LeftGroupBox:AddToggle('SkeletonESP', {
+    Text = 'Skeleton',
+    Default = false,
+    Tooltip = 'Toggle skeleton ESP on players',
+}):AddColorPicker('SkeletonESPColor', {
+    Default = Color3.new(1, 1, 1),
+    Title = 'Skeleton ESP Color',
+})
+
 LeftGroupBox:AddToggle('HealthBarESP', {
     Text = 'Health Bar ESP',
     Default = false,
@@ -250,6 +368,34 @@ LeftGroupBox:AddToggle('DistanceESP', {
 }):AddColorPicker('DistanceESPColor', {
     Default = Color3.new(0.8, 0.8, 0.8),
     Title = 'Distance ESP Color',
+})
+
+-- Add new Tracer ESP toggle with options
+LeftGroupBox:AddToggle('TracerESP', {
+    Text = 'Tracer ESP',
+    Default = false,
+    Tooltip = 'Draw lines from origin to player',
+}):AddColorPicker('TracerColor', {
+    Default = Color3.new(1, 1, 1),
+    Title = 'Tracer Color',
+})
+
+LeftGroupBox:AddDropdown('TracerOrigin', {
+    Values = { 'Top', 'Middle', 'Bottom', 'Mouse' },
+    Default = 1,
+    Multi = false,
+    Text = 'Tracer Origin',
+    Tooltip = 'Where the tracer line starts from',
+})
+
+-- Add new Weapon ESP toggle
+LeftGroupBox:AddToggle('WeaponESP', {
+    Text = 'Weapon ESP',
+    Default = false,
+    Tooltip = 'Show equipped weapon name',
+}):AddColorPicker('WeaponColor', {
+    Default = Color3.new(1, 0.5, 0),
+    Title = 'Weapon Color',
 })
 
 LeftGroupBox:AddSlider('RenderDistance', {
@@ -275,6 +421,116 @@ LeftGroupBox:AddDropdown('MyMultiDropdown', {
     Callback = function(Value)
         selectedChecks = Value
         print('[cb] ESP checks changed:', Value)
+    end
+})
+
+-- Lighting Section
+LightingGroup:AddToggle('AmbientEnabled', {
+    Text = 'Ambient',
+    Default = false,
+    Tooltip = 'Override ambient lighting',
+}):AddColorPicker('AmbientColor1', {
+    Default = Color3.new(0.5, 0.5, 0.5),
+    Title = 'Ambient Color',
+}):AddColorPicker('AmbientColor2', {
+    Default = Color3.new(0.5, 0.5, 0.5),
+    Title = 'Outdoor Ambient',
+})
+
+LightingGroup:AddToggle('TimeEnabled', {
+    Text = 'Time',
+    Default = false,
+    Tooltip = 'Override game time',
+})
+
+LightingGroup:AddSlider('TimeValue', {
+    Text = 'Time',
+    Default = 12,
+    Min = 0,
+    Max = 24,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        if Toggles.TimeEnabled.Value then
+            Lighting.ClockTime = Value
+        end
+    end
+})
+
+LightingGroup:AddToggle('BrightnessEnabled', {
+    Text = 'Brightness',
+    Default = false,
+    Tooltip = 'Override brightness',
+})
+
+LightingGroup:AddSlider('BrightnessValue', {
+    Text = 'Brightness',
+    Default = 1,
+    Min = 0,
+    Max = 10,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        if Toggles.BrightnessEnabled.Value then
+            Lighting.Brightness = Value
+        end
+    end
+})
+
+LightingGroup:AddToggle('ExposureEnabled', {
+    Text = 'Exposure',
+    Default = false,
+    Tooltip = 'Override exposure compensation',
+})
+
+LightingGroup:AddSlider('ExposureValue', {
+    Text = 'Exposure',
+    Default = 0,
+    Min = -5,
+    Max = 5,
+    Rounding = 1,
+    Compact = false,
+    Callback = function(Value)
+        if Toggles.ExposureEnabled.Value then
+            Lighting.ExposureCompensation = Value
+        end
+    end
+})
+
+LightingGroup:AddToggle('FogEnabled', {
+    Text = 'Fog',
+    Default = false,
+    Tooltip = 'Override fog settings',
+}):AddColorPicker('FogColor', {
+    Default = Color3.new(0.75, 0.75, 0.75),
+    Title = 'Fog Color',
+})
+
+LightingGroup:AddSlider('FogStart', {
+    Text = 'Fog Start',
+    Default = 0,
+    Min = 0,
+    Max = 1000,
+    Rounding = 0,
+    Compact = false,
+    Callback = function(Value)
+        if Toggles.FogEnabled.Value then
+            Lighting.FogStart = Value
+        end
+    end
+})
+
+LightingGroup:AddSlider('FogEnd', {
+    Text = 'Fog End',
+    Default = 100000,
+    Min = 100,
+    Max = 100000,
+    Rounding = 0,
+    Compact = false,
+    Callback = function(Value)
+        if Toggles.FogEnabled.Value then
+            Lighting.FogEnd = Value
+        end
     end
 })
 
@@ -396,13 +652,6 @@ CrosshairGroup:AddSlider('CrosshairResizeMax', {
     end
 })
 
--- Services
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local Camera = workspace.CurrentCamera
-local LocalPlayer = Players.LocalPlayer
-
 -- Aimbot Variables
 local currentTarget = nil
 local aimbotConnection = nil
@@ -415,19 +664,95 @@ local fovCircle = nil
 local fovOutline = nil
 local fovInline = nil
 local fovConnection = nil
+local fovPulseCircle = nil
+local pulseProgress = 0
+local pulseDirection = 1
+local pulseSpeed = 1
+local pulseRestartDelay = 0.2 -- Short delay before restarting pulse
+local pulseDelayTimer = 0	
+local currentPulseDirection = "Outward" -- Track current direction
 
 -- Crosshair Variables
 local crosshairLines = {}
 local crosshairConnection = nil
-local crosshairSpinAngle = 0
-local crosshairResizeScale = 1
-local crosshairResizeDirection = 1
+local spinAngle = 0
+local resizeScale = 1
+local resizeDirection = 1
+local crosshairParts = {}
+local lastCursorPos = Vector2.new(0, 0)
 
 -- Flying variables
 local flying = false
 local flySpeed = 50
 local bodyVelocity = nil
 local bodyGyro = nil
+
+local Skeleton_Lines = {}
+
+-- Lighting Event Handlers
+Toggles.AmbientEnabled:OnChanged(function()
+    if Toggles.AmbientEnabled.Value then
+        Lighting.Ambient = Options.AmbientColor1.Value
+        Lighting.OutdoorAmbient = Options.AmbientColor2.Value
+    else
+        Lighting.Ambient = originalLighting.Ambient
+        Lighting.OutdoorAmbient = originalLighting.OutdoorAmbient
+    end
+end)
+
+Options.AmbientColor1:OnChanged(function()
+    if Toggles.AmbientEnabled.Value then
+        Lighting.Ambient = Options.AmbientColor1.Value
+    end
+end)
+
+Options.AmbientColor2:OnChanged(function()
+    if Toggles.AmbientEnabled.Value then
+        Lighting.OutdoorAmbient = Options.AmbientColor2.Value
+    end
+end)
+
+Toggles.TimeEnabled:OnChanged(function()
+    if Toggles.TimeEnabled.Value then
+        Lighting.ClockTime = Options.TimeValue.Value
+    else
+        Lighting.ClockTime = originalLighting.ClockTime
+    end
+end)
+
+Toggles.BrightnessEnabled:OnChanged(function()
+    if Toggles.BrightnessEnabled.Value then
+        Lighting.Brightness = Options.BrightnessValue.Value
+    else
+        Lighting.Brightness = originalLighting.Brightness
+    end
+end)
+
+Toggles.ExposureEnabled:OnChanged(function()
+    if Toggles.ExposureEnabled.Value then
+        Lighting.ExposureCompensation = Options.ExposureValue.Value
+    else
+        Lighting.ExposureCompensation = originalLighting.ExposureCompensation
+    end
+end)
+
+Toggles.FogEnabled:OnChanged(function()
+    if Toggles.FogEnabled.Value then
+        Lighting.FogStart = Options.FogStart.Value
+        Lighting.FogEnd = Options.FogEnd.Value
+        Lighting.FogColor = Options.FogColor.Value
+    else
+        Lighting.FogStart = originalLighting.FogStart
+        Lighting.FogEnd = originalLighting.FogEnd
+        Lighting.FogColor = originalLighting.FogColor
+    end
+end)
+
+Options.FogColor:OnChanged(function()
+    if Toggles.FogEnabled.Value then
+        Lighting.FogColor = Options.FogColor.Value
+    end
+end)
 
 local function setNoClip(state)
     local character = LocalPlayer.Character
@@ -471,7 +796,32 @@ local function stopFlying()
     flying = false
 end
 
+-- Function to perform ground detection raycast
+local function getGroundPosition(rootPart)
+    local character = LocalPlayer.Character
+    if not character then return rootPart.Position end
+    
+    local raycastParams = RaycastParams.new()
+    raycastParams.FilterType = Enum.RaycastFilterType.Blacklist
+    raycastParams.FilterDescendantsInstances = {character}
+    
+    local rayOrigin = rootPart.Position
+    local rayDirection = Vector3.new(0, -100, 0) -- Cast down 100 studs
+    
+    local result = workspace:Raycast(rayOrigin, rayDirection, raycastParams)
+    
+    if result then
+        -- Return position slightly above ground to prevent clipping
+        return Vector3.new(rootPart.Position.X, result.Position.Y + 3, rootPart.Position.Z)
+    else
+        -- No ground found, maintain current Y position
+        return rootPart.Position
+    end
+end
+
+
 RunService.RenderStepped:Connect(function(deltaTime)
+    -- Basic character checks
     local character = LocalPlayer.Character
     if not character then return end
     local humanoid = character:FindFirstChildOfClass("Humanoid")
@@ -480,89 +830,93 @@ RunService.RenderStepped:Connect(function(deltaTime)
     if not rootPart then return end
     
     local camera = workspace.CurrentCamera
-    
-    -- Speed
-    if Toggles.SpeedEnabled.Value and Options.SpeedKey:GetState() then
-        humanoid.WalkSpeed = Options.SpeedValue.Value
+    local defaultJumpPower = 50
+    local defaultHipHeight = 2.0
+
+    -- Jump Power (Toggle)
+    if Toggles.JumpPowerEnabled.Value then
+        humanoid.JumpPower = Options.JumpPowerKey:GetState() and Options.JumpPowerValue.Value or defaultJumpPower
     else
-        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = defaultJumpPower
     end
-    
-    -- Fly
-    if Toggles.FlyEnabled.Value and Options.FlyKey:GetState() then
-        if not flying then
-            startFlying(rootPart)
-        end
-        
-        flySpeed = Options.FlySpeed.Value or 50
+
+    -- Hip Height (Crouch/Slide)
+    local targetHipHeight = defaultHipHeight
+    if Toggles.HipHeightEnabled.Value and Options.HipHeightKey:GetState() then
+        targetHipHeight = Options.HipHeightValue.Value
+    end
+    humanoid.HipHeight = humanoid.HipHeight + (targetHipHeight - humanoid.HipHeight) * 0.2
+
+    -- Speed Boost
+    if Toggles.SpeedEnabled.Value and Options.SpeedKey:GetState() then
         local moveVector = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector += camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector -= camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector -= camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector += camera.CFrame.RightVector end
         
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            moveVector += camera.CFrame.LookVector * flySpeed
+        if moveVector.Magnitude > 0 then
+            rootPart.Velocity = Vector3.new(
+                moveVector.Unit.X * Options.SpeedValue.Value,
+                rootPart.Velocity.Y,
+                moveVector.Unit.Z * Options.SpeedValue.Value
+            )
+        else
+            rootPart.Velocity = Vector3.new(0, rootPart.Velocity.Y, 0)
         end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            moveVector -= camera.CFrame.LookVector * flySpeed
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            moveVector -= camera.CFrame.RightVector * flySpeed
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            moveVector += camera.CFrame.RightVector * flySpeed
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then
-            moveVector += camera.CFrame.UpVector * flySpeed
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then
-            moveVector -= camera.CFrame.UpVector * flySpeed
-        end
+    end
+
+    -- Walk Speed
+    humanoid.WalkSpeed = Toggles.WalkSpeedEnabled.Value and 
+        (Options.WalkSpeedKey:GetState() and Options.WalkSpeedValue.Value or originalWalkSpeed) 
+        or originalWalkSpeed
+
+    -- Fly Mode
+    if Toggles.FlyEnabled.Value and Options.FlyKey:GetState() then
+        if not flying then startFlying(rootPart) end
+        
+        local moveVector = Vector3.new()
+        if UserInputService:IsKeyDown(Enum.KeyCode.W) then moveVector += camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.S) then moveVector -= camera.CFrame.LookVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.A) then moveVector -= camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.D) then moveVector += camera.CFrame.RightVector end
+        if UserInputService:IsKeyDown(Enum.KeyCode.Space) then moveVector += Vector3.new(0, 1, 0) end
+        if UserInputService:IsKeyDown(Enum.KeyCode.LeftControl) then moveVector -= Vector3.new(0, 1, 0) end
         
         if bodyVelocity then
-            bodyVelocity.Velocity = moveVector
+            bodyVelocity.Velocity = moveVector.Unit * Options.FlySpeed.Value
         end
         if bodyGyro then
             bodyGyro.CFrame = CFrame.new(rootPart.Position, rootPart.Position + camera.CFrame.LookVector)
         end
         humanoid.PlatformStand = true
-    else
-        if flying then
-            stopFlying()
-        end
+    elseif flying then
+        stopFlying()
         humanoid.PlatformStand = false
     end
-    
+
     -- Bunny Hop
     if Toggles.BunnyHopEnabled.Value and Options.BunnyHopKey:GetState() then
-    if humanoid.FloorMaterial ~= Enum.Material.Air then
-        humanoid.Jump = true
-        
-        -- Apply forward movement
-        local direction = Vector3.new(0, 0, 0)
-        local speed = Options.BunnyHopspeed.Value or 50
-
-        if UserInputService:IsKeyDown(Enum.KeyCode.W) then
-            direction += camera.CFrame.LookVector * speed
+        if humanoid.FloorMaterial ~= Enum.Material.Air then
+            humanoid.Jump = true
+            local direction = Vector3.new()
+            if UserInputService:IsKeyDown(Enum.KeyCode.W) then direction += camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.S) then direction -= camera.CFrame.LookVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.A) then direction -= camera.CFrame.RightVector end
+            if UserInputService:IsKeyDown(Enum.KeyCode.D) then direction += camera.CFrame.RightVector end
+            
+            if direction.Magnitude > 0 then
+                rootPart.Velocity = Vector3.new(
+                    direction.Unit.X * Options.BunnyHopspeed.Value,
+                    rootPart.Velocity.Y,
+                    direction.Unit.Z * Options.BunnyHopspeed.Value
+                )
+            end
         end
-        if UserInputService:IsKeyDown(Enum.KeyCode.S) then
-            direction -= camera.CFrame.LookVector * speed
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.A) then
-            direction -= camera.CFrame.RightVector * speed
-        end
-        if UserInputService:IsKeyDown(Enum.KeyCode.D) then
-            direction += camera.CFrame.RightVector * speed
-        end
-
-        -- Apply horizontal velocity
-        rootPart.Velocity = Vector3.new(direction.X, rootPart.Velocity.Y, direction.Z)
     end
-end
-    
+
     -- NoClip
-    if Toggles.NoClipEnabled.Value and Options.NoClipKey:GetState() then
-        setNoClip(true)
-    else
-        setNoClip(false)
-    end
+    setNoClip(Toggles.NoClipEnabled.Value and Options.NoClipKey:GetState())
 end)
 
 -- Key state management
@@ -711,7 +1065,7 @@ end
 local function createFOVSystem()
     if fovCircle then return end
     
-    -- Create outline (black, thicker)
+    -- Existing FOV circles (outline, main, inline)
     fovOutline = Drawing.new("Circle")
     fovOutline.Visible = false
     fovOutline.Color = Color3.fromRGB(0, 0, 0)
@@ -720,7 +1074,6 @@ local function createFOVSystem()
     fovOutline.Filled = false
     fovOutline.Transparency = 1
     
-    -- Create main circle
     fovCircle = Drawing.new("Circle")
     fovCircle.Visible = false
     fovCircle.Color = Color3.fromRGB(255, 255, 255)
@@ -729,7 +1082,6 @@ local function createFOVSystem()
     fovCircle.Filled = false
     fovCircle.Transparency = 1
     
-    -- Create inline (black, thinner)
     fovInline = Drawing.new("Circle")
     fovInline.Visible = false
     fovInline.Color = Color3.fromRGB(0, 0, 0)
@@ -737,46 +1089,97 @@ local function createFOVSystem()
     fovInline.Radius = 100
     fovInline.Filled = false
     fovInline.Transparency = 1
+    
+    -- New pulse circle
+    fovPulseCircle = Drawing.new("Circle")
+    fovPulseCircle.Visible = false
+    fovPulseCircle.Color = Color3.fromRGB(255, 255, 255)
+    fovPulseCircle.Thickness = 2
+    fovPulseCircle.Radius = 0
+    fovPulseCircle.Filled = false
+    fovPulseCircle.Transparency = 0.7
 end
 
--- Update FOV circle system (now follows cursor)
-local function updateFOVSystem()
-    if not fovCircle then
-        createFOVSystem()
-    end
+
+local function updateFOVSystem(deltaTime)
+    if not fovCircle then createFOVSystem() end
     
     if Toggles.FOVEnabled.Value then
-        -- Get mouse position instead of screen center
         local mousePos = UserInputService:GetMouseLocation()
-        
         local radius = Options.FOVRadius.Value
         local thickness = Options.FOVThickness.Value
         local color = Options.FOVColor.Value
         
-        -- Update outline (black, thicker)
+        -- Update main FOV circles (existing code remains the same)
         fovOutline.Position = mousePos
         fovOutline.Radius = radius
-        fovOutline.Thickness = thickness + 2 -- Make outline thicker
-        fovOutline.Color = Color3.fromRGB(0, 0, 0)
+        fovOutline.Thickness = thickness + 2
         fovOutline.Visible = true
         
-        -- Update main circle
         fovCircle.Position = mousePos
         fovCircle.Radius = radius
         fovCircle.Thickness = thickness
         fovCircle.Color = color
         fovCircle.Visible = true
         
-        -- Update inline (black, thinner)
         fovInline.Position = mousePos
         fovInline.Radius = radius
         fovInline.Thickness = 1
-        fovInline.Color = Color3.fromRGB(0, 0, 0)
         fovInline.Visible = true
+        
+        -- Handle pulse effect
+        if Toggles.FOVPulseEnabled.Value then
+            pulseSpeed = Options.FOVPulseSpeed.Value
+            
+            if pulseDelayTimer > 0 then
+                pulseDelayTimer = pulseDelayTimer - deltaTime
+            else
+                -- Update pulse progress based on direction
+                if pulseDirection == "Outward" then
+                    pulseProgress = pulseProgress + (deltaTime * pulseSpeed)
+                    if pulseProgress >= 1 then
+                        pulseProgress = 0
+                        pulseDelayTimer = pulseRestartDelay
+                    end
+                else -- "Inward"
+                    pulseProgress = pulseProgress + (deltaTime * pulseSpeed)
+                    if pulseProgress >= 1 then
+                        pulseProgress = 0
+                        pulseDelayTimer = pulseRestartDelay
+                    end
+                end
+            end
+            
+            -- Calculate pulse radius based on direction
+            local pulseRadius
+            if pulseDirection == "Outward" then
+                pulseRadius = radius * pulseProgress
+            else
+                pulseRadius = radius * (1 - pulseProgress)
+            end
+            
+            -- Update pulse circle
+            if not fovPulseCircle then
+                fovPulseCircle = Drawing.new("Circle")
+                fovPulseCircle.Visible = false
+                fovPulseCircle.Filled = false
+                fovPulseCircle.Transparency = 0.7
+            end
+            
+            fovPulseCircle.Position = mousePos
+            fovPulseCircle.Radius = pulseRadius
+            fovPulseCircle.Color = color
+            fovPulseCircle.Thickness = 2
+            fovPulseCircle.Visible = true
+            fovPulseCircle.Transparency = 0.7 * (1 - pulseProgress * 0.5)
+        elseif fovPulseCircle then
+            fovPulseCircle.Visible = false
+        end
     else
         if fovOutline then fovOutline.Visible = false end
         if fovCircle then fovCircle.Visible = false end
         if fovInline then fovInline.Visible = false end
+        if fovPulseCircle then fovPulseCircle.Visible = false end
     end
 end
 
@@ -785,133 +1188,115 @@ local function startFOV()
     if fovConnection then return end
     
     createFOVSystem()
-    fovConnection = RunService.RenderStepped:Connect(updateFOVSystem)
+    fovConnection = RunService.RenderStepped:Connect(function(deltaTime)
+        updateFOVSystem(deltaTime)
+    end)
 end
 
--- Stop FOV system
+-- Modify the stopFOV function to clean up the pulse circle
 local function stopFOV()
     if fovConnection then
         fovConnection:Disconnect()
         fovConnection = nil
     end
     
-    if fovOutline then
-        fovOutline:Remove()
-        fovOutline = nil
-    end
+    if fovOutline then fovOutline:Remove() end
+    if fovCircle then fovCircle:Remove() end
+    if fovInline then fovInline:Remove() end
+    if fovPulseCircle then fovPulseCircle:Remove() end
     
-    if fovCircle then
-        fovCircle:Remove()
-        fovCircle = nil
-    end
-    
-    if fovInline then
-        fovInline:Remove()
-        fovInline = nil
-    end
+    fovOutline = nil
+    fovCircle = nil
+    fovInline = nil
+    fovPulseCircle = nil
 end
 
--- Crosshair System
 local function createCrosshair()
-    if #crosshairLines > 0 then return end
-    
-    -- Create 4 lines for the crosshair
-    for i = 1, 4 do
+    -- Clear existing
+    for _, part in ipairs(crosshairParts) do
+        part:Remove()
+    end
+    crosshairParts = {}
+
+    -- Create outline and main line for each arm (4 arms × 2 layers)
+    for i = 1, 8 do
         local line = Drawing.new("Line")
         line.Visible = false
-        line.Color = Color3.fromRGB(255, 255, 255)
-        line.Thickness = 2
         line.Transparency = 1
-        table.insert(crosshairLines, line)
+        line.Thickness = i <= 4 and 3 or 1 -- Outline is 3px, main is 1px
+        line.Color = i <= 4 and Color3.new(0, 0, 0) or Color3.new(1, 1, 1)
+        table.insert(crosshairParts, line)
     end
 end
 
 local function updateCrosshair(deltaTime)
     if not Toggles.CrosshairVisible.Value then
-        for _, line in ipairs(crosshairLines) do
-            line.Visible = false
+        for _, part in ipairs(crosshairParts) do
+            part.Visible = false
         end
         return
     end
-    
-    if #crosshairLines == 0 then
-        createCrosshair()
-    end
-    
-    -- Get screen center
-    local screenSize = Camera.ViewportSize
-    local center = Vector2.new(screenSize.X / 2, screenSize.Y / 2)
-    
-    -- Get crosshair settings
+
+    -- Initialize if needed
+    if #crosshairParts == 0 then createCrosshair() end
+
+    -- Get cursor position
+    local cursorPos = UserInputService:GetMouseLocation()
+
+    -- Get settings
     local gap = Options.CrosshairGap.Value
-    local length = Options.CrosshairLength.Value
-    local thickness = Options.CrosshairThickness.Value
-    local rotation = Options.CrosshairRotation.Value
     local color = Options.CrosshairColor.Value
-    
+    local thickness = Options.CrosshairThickness.Value
+
     -- Handle spin animation
     if Toggles.CrosshairSpin.Value then
-        local spinSpeed = Options.CrosshairSpinSpeed.Value
-        crosshairSpinAngle = (crosshairSpinAngle + spinSpeed * deltaTime) % 360
-        rotation = rotation + crosshairSpinAngle
+        spinAngle = (spinAngle + Options.CrosshairSpinSpeed.Value * deltaTime) % 360
     end
-    
+    local rotation = math.rad(Options.CrosshairRotation.Value + spinAngle)
+
     -- Handle resize animation
-    local actualLength = length
     if Toggles.CrosshairResize.Value then
-        local resizeSpeed = Options.CrosshairResizeSpeed.Value
-        local minLength = Options.CrosshairResizeMin.Value
-        local maxLength = Options.CrosshairResizeMax.Value
-        
-        -- Update resize scale
-        crosshairResizeScale = crosshairResizeScale + (crosshairResizeDirection * resizeSpeed * deltaTime * 0.01)
-        
-        -- Check bounds and reverse direction
-        if crosshairResizeScale >= 1 then
-            crosshairResizeScale = 1
-            crosshairResizeDirection = -1
-        elseif crosshairResizeScale <= 0 then
-            crosshairResizeScale = 0
-            crosshairResizeDirection = 1
-        end
-        
-        -- Apply resize effect
-        actualLength = minLength + (maxLength - minLength) * crosshairResizeScale
+        resizeAnimTime = resizeAnimTime + deltaTime * Options.CrosshairResizeSpeed.Value * 0.1
+        local pulse = math.sin(resizeAnimTime) * 0.5 + 0.5
+        currentLength = Options.CrosshairResizeMin.Value + 
+                      (Options.CrosshairResizeMax.Value - Options.CrosshairResizeMin.Value) * pulse
+    else
+        currentLength = Options.CrosshairLength.Value
+        resizeAnimTime = 0
     end
-    
-    -- Convert rotation to radians
-    local rotRad = math.rad(rotation)
-    
-    -- Define base directions for the 4 lines (top, right, bottom, left)
+
+    -- Base directions
     local directions = {
         Vector2.new(0, -1),  -- Top
         Vector2.new(1, 0),   -- Right
         Vector2.new(0, 1),   -- Bottom
         Vector2.new(-1, 0)   -- Left
     }
-    
-    -- Update each line
-    for i, line in ipairs(crosshairLines) do
-        local direction = directions[i]
-        
-        -- Apply rotation to direction
-        local cos = math.cos(rotRad)
-        local sin = math.sin(rotRad)
+
+    -- Update each crosshair arm
+    for i, dir in ipairs(directions) do
+        -- Rotate direction
         local rotatedDir = Vector2.new(
-            direction.X * cos - direction.Y * sin,
-            direction.X * sin + direction.Y * cos
+            dir.X * math.cos(rotation) - dir.Y * math.sin(rotation),
+            dir.X * math.sin(rotation) + dir.Y * math.cos(rotation)
         )
-        
-        -- Calculate start and end positions
-        local startPos = center + rotatedDir * gap
-        local endPos = center + rotatedDir * (gap + actualLength)
-        
-        -- Update line properties
-        line.From = startPos
-        line.To = endPos
-        line.Color = color
-        line.Thickness = thickness
-        line.Visible = true
+
+        -- Calculate positions
+        local startPos = cursorPos + rotatedDir * gap
+        local endPos = cursorPos + rotatedDir * (gap + currentLength)
+
+        -- Update outline (black background)
+        crosshairParts[i].From = startPos
+        crosshairParts[i].To = endPos
+        crosshairParts[i].Thickness = thickness + 2 -- Outline thickness
+        crosshairParts[i].Visible = true
+
+        -- Update main line (colored foreground)
+        crosshairParts[i+4].From = startPos
+        crosshairParts[i+4].To = endPos
+        crosshairParts[i+4].Color = color
+        crosshairParts[i+4].Thickness = thickness -- Main thickness
+        crosshairParts[i+4].Visible = true
     end
 end
 
@@ -1252,6 +1637,133 @@ local function getHealthColor(healthPercent)
     end
 end
 
+local R15Connections = {
+    -- Head and torso
+    {"Head", "UpperTorso"},
+    {"UpperTorso", "LowerTorso"},
+    
+    -- Arms
+    {"UpperTorso", "LeftUpperArm"},
+    {"LeftUpperArm", "LeftLowerArm"},
+    {"LeftLowerArm", "LeftHand"},
+    {"UpperTorso", "RightUpperArm"},
+    {"RightUpperArm", "RightLowerArm"},
+    {"RightLowerArm", "RightHand"},
+    
+    -- Legs
+    {"LowerTorso", "LeftUpperLeg"},
+    {"LeftUpperLeg", "LeftLowerLeg"},
+    {"LeftLowerLeg", "LeftFoot"},
+    {"LowerTorso", "RightUpperLeg"},
+    {"RightUpperLeg", "RightLowerLeg"},
+    {"RightLowerLeg", "RightFoot"}
+}
+
+-- R6 bone connections
+local R6Connections = {
+    -- Head and torso
+    {"Head", "Torso"},
+    
+    -- Arms
+    {"Torso", "Left Arm"},
+    {"Left Arm", "LeftHand"},
+    {"Torso", "Right Arm"},
+    {"Right Arm", "RightHand"},
+    
+    -- Legs
+    {"Torso", "Left Leg"},
+    {"Left Leg", "LeftFoot"},
+    {"Torso", "Right Leg"},
+    {"Right Leg", "RightFoot"}
+}
+
+local function createSkeletonESP(player)
+    -- Check if player and character exist
+    if not player or not player.Character then return end
+    
+    -- Don't recreate if already exists
+    if Skeleton_Lines[player] then return end
+    
+    Skeleton_Lines[player] = {}
+    
+    -- Verify character exists before proceeding
+    if not player.Character then return end
+    
+    -- Create lines for each bone connection
+    local connections = player.Character:FindFirstChild("UpperTorso") and R15Connections or R6Connections
+    for i = 1, #connections do
+        -- Main line
+        local line = Drawing.new("Line")
+        line.Visible = false
+        line.Thickness = 1
+        line.Color = Color3.new(1, 1, 1)
+        line.Transparency = 1
+        
+        table.insert(Skeleton_Lines[player], line)
+    end
+end
+
+local function updateSkeletonESP(player)
+    if not Skeleton_Lines[player] or not player.Character then return end
+    
+    local connections = player.Character:FindFirstChild("UpperTorso") and R15Connections or R6Connections
+    local color = Options.SkeletonESPColor.Value
+    
+    for i = 1, #connections do
+        local part1 = player.Character:FindFirstChild(connections[i][1])
+        local part2 = player.Character:FindFirstChild(connections[i][2])
+        
+        if part1 and part2 then
+            local pos1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
+            local pos2, onScreen2 = Camera:WorldToViewportPoint(part2.Position)
+            
+            if onScreen1 and onScreen2 then
+                -- Update main line
+                Skeleton_Lines[player][i].From = Vector2.new(pos1.X, pos1.Y)
+                Skeleton_Lines[player][i].To = Vector2.new(pos2.X, pos2.Y)
+                Skeleton_Lines[player][i].Color = color
+                Skeleton_Lines[player][i].Visible = Toggles.SkeletonESP.Value
+            else
+                Skeleton_Lines[player][i].Visible = false
+            end
+        else
+            Skeleton_Lines[player][i].Visible = false
+        end
+    end
+end
+
+local function cleanupSkeletonESP(player)
+    if Skeleton_Lines[player] then
+        for _, line in ipairs(Skeleton_Lines[player]) do
+            line:Remove()
+        end
+        Skeleton_Lines[player] = nil
+    end
+end
+
+local function getPlayerWeapon(player)
+    if not player.Character then return nil end
+    
+    -- Check for tool in character
+    for _, child in ipairs(player.Character:GetChildren()) do
+        if child:IsA("Tool") then
+            return child.Name
+        end
+    end
+    
+    -- Check for tool in backpack
+    local backpack = player:FindFirstChild("Backpack")
+    if backpack then
+        for _, tool in ipairs(backpack:GetChildren()) do
+            if tool:IsA("Tool") then
+                return tool.Name
+            end
+        end
+    end
+    
+    return nil
+end
+
 local function newBoxSet()
     local outline = Drawing.new("Square")
     outline.Visible = false
@@ -1307,6 +1819,29 @@ local function newBoxSet()
     distanceText.OutlineColor = Color3.fromRGB(0, 0, 0)
     distanceText.Font = Drawing.Fonts.UI
 
+    -- New tracer ESP components
+    local tracerOutline = Drawing.new("Line")
+    tracerOutline.Visible = false
+    tracerOutline.Color = Color3.fromRGB(0, 0, 0)
+    tracerOutline.Thickness = 3
+    tracerOutline.Transparency = 1
+
+    local tracerLine = Drawing.new("Line")
+    tracerLine.Visible = false
+    tracerLine.Color = Color3.fromRGB(255, 255, 255)
+    tracerLine.Thickness = 1
+    tracerLine.Transparency = 1
+
+    -- New weapon ESP text
+    local weaponText = Drawing.new("Text")
+    weaponText.Visible = false
+    weaponText.Color = Color3.fromRGB(255, 128, 0)
+    weaponText.Size = 14
+    weaponText.Center = true
+    weaponText.Outline = true
+    weaponText.OutlineColor = Color3.fromRGB(0, 0, 0)
+    weaponText.Font = Drawing.Fonts.UI
+
     return { 
         Box = box, 
         Outline = outline, 
@@ -1315,7 +1850,10 @@ local function newBoxSet()
         HealthBarBg = healthBarBg,
         HealthBar = healthBar,
         NameText = nameText,
-        DistanceText = distanceText
+        DistanceText = distanceText,
+        TracerOutline = tracerOutline,
+        TracerLine = tracerLine,
+        WeaponText = weaponText
     }
 end
 
@@ -1330,19 +1868,13 @@ local function cleanupESP(player)
         ESP_Boxes[player].HealthBar:Remove()
         ESP_Boxes[player].NameText:Remove()
         ESP_Boxes[player].DistanceText:Remove()
+        ESP_Boxes[player].TracerOutline:Remove()
+        ESP_Boxes[player].TracerLine:Remove()
+        ESP_Boxes[player].WeaponText:Remove()
         ESP_Boxes[player] = nil
     end
-end
-
-local function addESP(player)
-    if player == LocalPlayer or ESP_Boxes[player] then return end
-    ESP_Boxes[player] = newBoxSet()
-
-    player.AncestryChanged:Connect(function(_, parent)
-        if not parent then
-            cleanupESP(player)
-        end
-    end)
+    
+    cleanupSkeletonESP(player)
 end
 
 Players.PlayerRemoving:Connect(function(player)
@@ -1404,6 +1936,38 @@ local function hideESP(data)
     data.HealthBar.Visible = false
     data.NameText.Visible = false
     data.DistanceText.Visible = false
+    data.TracerOutline.Visible = false
+    data.TracerLine.Visible = false
+    data.WeaponText.Visible = false
+end
+
+local function addESP(player)
+    -- Skip local player and existing ESP
+    if player == LocalPlayer or ESP_Boxes[player] then return end
+    
+    -- Only proceed if player has a character
+    if not player.Character then
+        -- Set up a connection to wait for character
+        local connection
+        connection = player.CharacterAdded:Connect(function(char)
+            connection:Disconnect()
+            ESP_Boxes[player] = newBoxSet()
+            createSkeletonESP(player)
+        end)
+        return
+    end
+    
+    -- If character already exists
+    ESP_Boxes[player] = newBoxSet()
+    createSkeletonESP(player)
+
+    -- Cleanup when player leaves
+    player.AncestryChanged:Connect(function(_, parent)
+        if not parent then
+            cleanupESP(player)
+            cleanupSkeletonESP(player)
+        end
+    end)
 end
 
 local function startESP()
@@ -1419,30 +1983,49 @@ local function startESP()
         local healthEnabled = Toggles.HealthBarESP.Value
         local nameEnabled = Toggles.NameESP.Value
         local distanceEnabled = Toggles.DistanceESP.Value
+        local skeletonEnabled = Toggles.SkeletonESP.Value
+        local tracerEnabled = Toggles.TracerESP.Value
+        local weaponEnabled = Toggles.WeaponESP.Value
         local boxColor = Options.BoxESPColor.Value
         local nameColor = Options.NameESPColor.Value
         local distanceColor = Options.DistanceESPColor.Value
+        local skeletonColor = Options.SkeletonESPColor.Value
+        local tracerColor = Options.TracerColor.Value
+        local weaponColor = Options.WeaponColor.Value
+        local tracerOrigin = Options.TracerOrigin.Value
 
         for player, data in pairs(ESP_Boxes) do
             if not player.Parent or player == LocalPlayer then
                 hideESP(data)
+                if Skeleton_Lines[player] then
+                    cleanupSkeletonESP(player)
+                end
                 continue
             end
             
             local char = player.Character
             if not char or not char.Parent then
                 hideESP(data)
+                if Skeleton_Lines[player] then
+                    cleanupSkeletonESP(player)
+                end
                 continue
             end
 
             -- Continue with regular ESP logic only if ESP is enabled
             if not espEnabled then
                 hideESP(data)
+                if Skeleton_Lines[player] then
+                    cleanupSkeletonESP(player)
+                end
                 continue
             end
 
             if not shouldShowPlayer(player) then
                 hideESP(data)
+                if Skeleton_Lines[player] then
+                    cleanupSkeletonESP(player)
+                end
                 continue
             end
 
@@ -1490,13 +2073,31 @@ local function startESP()
                     end
 
                     if distanceEnabled then
-                        data.DistanceText.Text = tostring(distance)
-                        data.DistanceText.Color = distanceColor
-                        data.DistanceText.Position = Vector2.new(minVec.X + width/2, maxVec.Y + 5)
-                        data.DistanceText.Visible = true
-                    else
-                        data.DistanceText.Visible = false
-                    end
+    data.DistanceText.Text = tostring(distance) .. " studs"
+    data.DistanceText.Color = distanceColor
+    -- Position distance text below weapon text (add 15 pixels below box if no weapon, or below weapon if present)
+    local yOffset = weaponEnabled and data.WeaponText.Visible and 17 or 2
+    data.DistanceText.Position = Vector2.new(minVec.X + width/2, maxVec.Y + yOffset)
+    data.DistanceText.Visible = true
+else
+    data.DistanceText.Visible = false
+end
+
+                    -- Weapon ESP (positioned between box and distance)
+                    if weaponEnabled then
+            local weapon = getPlayerWeapon(player)
+         if weapon then
+        data.WeaponText.Text = weapon
+        data.WeaponText.Color = weaponColor
+        -- Position weapon text just below the box
+        data.WeaponText.Position = Vector2.new(minVec.X + width/2, maxVec.Y + 2)
+        data.WeaponText.Visible = true
+    else
+        data.WeaponText.Visible = false
+    end
+else
+    data.WeaponText.Visible = false
+end
 
                     if healthEnabled then
                         local humanoid = char:FindFirstChildOfClass("Humanoid")
@@ -1528,11 +2129,85 @@ local function startESP()
                         data.HealthBarBg.Visible = false
                         data.HealthBar.Visible = false
                     end
+
+                    -- Tracer ESP
+                    if tracerEnabled then
+                        -- Get target position (bottom of box)
+                        local targetPos = Vector2.new(minVec.X + width/2, maxVec.Y)
+                        
+                        -- Get origin position based on setting
+                        local originPos
+                        if tracerOrigin == "Top" then
+                            originPos = Vector2.new(Camera.ViewportSize.X/2, 0)
+                        elseif tracerOrigin == "Middle" then
+                            originPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y/2)
+                        elseif tracerOrigin == "Bottom" then
+                            originPos = Vector2.new(Camera.ViewportSize.X/2, Camera.ViewportSize.Y)
+                        else -- Mouse
+                            originPos = UserInputService:GetMouseLocation()
+                        end
+                        
+                        -- Update tracer line
+                        data.TracerOutline.From = originPos
+                        data.TracerOutline.To = targetPos
+                        data.TracerOutline.Visible = true
+                        
+                        data.TracerLine.From = originPos
+                        data.TracerLine.To = targetPos
+                        data.TracerLine.Color = tracerColor
+                        data.TracerLine.Visible = true
+                    else
+                        data.TracerOutline.Visible = false
+                        data.TracerLine.Visible = false
+                    end
+
+                    -- Skeleton ESP
+                    if skeletonEnabled then
+                        -- Initialize skeleton if not exists
+                        if not Skeleton_Lines[player] then
+                            createSkeletonESP(player)
+                        end
+                        
+                        -- Update skeleton
+                        local connections = char:FindFirstChild("UpperTorso") and R15Connections or R6Connections
+                        
+                        for i = 1, #connections do
+                            local part1 = char:FindFirstChild(connections[i][1])
+                            local part2 = char:FindFirstChild(connections[i][2])
+                            
+                            if part1 and part2 then
+                                local pos1, onScreen1 = Camera:WorldToViewportPoint(part1.Position)
+                                local pos2, onScreen2 = Camera:WorldToViewportPoint(part2.Position)
+                                
+                                if onScreen1 and onScreen2 then
+                                    -- Update main line
+                                    Skeleton_Lines[player][i].From = Vector2.new(pos1.X, pos1.Y)
+                                    Skeleton_Lines[player][i].To = Vector2.new(pos2.X, pos2.Y)
+                                    Skeleton_Lines[player][i].Color = skeletonColor
+                                    Skeleton_Lines[player][i].Visible = true
+                                else
+                                    Skeleton_Lines[player][i].Visible = false
+                                end
+                            else
+                                Skeleton_Lines[player][i].Visible = false
+                            end
+                        end
+                    else
+                        if Skeleton_Lines[player] then
+                            cleanupSkeletonESP(player)
+                        end
+                    end
                 else
                     hideESP(data)
+                    if Skeleton_Lines[player] then
+                        cleanupSkeletonESP(player)
+                    end
                 end
             else
                 hideESP(data)
+                if Skeleton_Lines[player] then
+                    cleanupSkeletonESP(player)
+                end
             end
         end
     end)
@@ -1548,6 +2223,12 @@ local function stopESP()
         cleanupESP(player)
     end
 end
+
+Options.FOVPulseDirection:OnChanged(function(value)
+    pulseDirection = value
+    pulseProgress = 0 -- Reset animation when direction changes
+    pulseDelayTimer = 0
+end)
 
 -- UI Event Handlers
 Toggles.ESPEnabled:OnChanged(function()
