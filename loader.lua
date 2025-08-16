@@ -6,7 +6,7 @@ local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 local Window = Library:CreateWindow({
-    Title = 'ESP Menu',
+    Title = 'Roterygoose23ware',
     Center = true,
     AutoShow = true,
     TabPadding = 8,
@@ -27,6 +27,7 @@ local LeftGroupBox = Tabs.Main:AddLeftGroupbox('Player Visuals')
 local LightingGroup = Tabs.Main:AddLeftGroupbox('Lighting')
 local CrosshairGroup = Tabs.Main:AddRightGroupbox('Crosshair')
 local MiscGroup = Tabs.Rage:AddRightGroupbox('Misc')
+
 -- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
@@ -44,7 +45,8 @@ local originalLighting = {
     ExposureCompensation = Lighting.ExposureCompensation,
     FogStart = Lighting.FogStart,
     FogEnd = Lighting.FogEnd,
-    FogColor = Lighting.FogColor
+    FogColor = Lighting.FogColor,
+    Technology = Lighting.Technology
 }
 
 -- Store original walk speed
@@ -181,6 +183,28 @@ ManipulationGroup:AddSlider('HipHeightValue', {
     Default = 2, -- Better default value
     Min = 2, -- Minimum safe value
     Max = 50,
+    Rounding = 1,
+    Compact = false,
+})
+
+-- Free Cam in Misc Group
+MiscGroup:AddToggle('FreeCamEnabled', {
+    Text = 'Free Cam',
+    Default = false,
+    Tooltip = 'Allows camera to move freely while anchoring player',
+}):AddKeyPicker('FreeCamKey', {
+    Default = 'C', -- Default keybind
+    SyncToggleState = false,
+    Mode = 'Toggle',
+    Text = 'Free Cam Key',
+    NoUI = false
+})
+
+MiscGroup:AddSlider('FreeCamSpeed', {
+    Text = 'Free Cam Speed',
+    Default = 16,
+    Min = 1,
+    Max = 100,
     Rounding = 1,
     Compact = false,
 })
@@ -534,6 +558,25 @@ LightingGroup:AddSlider('FogEnd', {
     end
 })
 
+LightingGroup:AddToggle('TechnologyEnabled', {
+    Text = 'Technology',
+    Default = false,
+    Tooltip = 'Override lighting technology',
+})
+
+LightingGroup:AddDropdown('TechnologyValue', {
+    Values = { 'Legacy', 'Voxel', 'Compatibility', 'ShadowMap', 'Future' },
+    Default = 1,
+    Multi = false,
+    Text = 'Lighting Technology',
+    Tooltip = 'Select lighting technology (affects performance and visuals)',
+    Callback = function(Value)
+        if Toggles.TechnologyEnabled.Value then
+            Lighting.Technology = Enum.Technology[Value]
+        end
+    end
+})
+
 -- Crosshair Section
 CrosshairGroup:AddToggle('CrosshairVisible', {
     Text = 'Visible',
@@ -680,12 +723,24 @@ local resizeScale = 1
 local resizeDirection = 1
 local crosshairParts = {}
 local lastCursorPos = Vector2.new(0, 0)
+local resizeAnimTime = 0
+local currentLength = 20 -- Default length
 
 -- Flying variables
 local flying = false
 local flySpeed = 50
 local bodyVelocity = nil
 local bodyGyro = nil
+
+-- Free Cam Variables
+local freeCamEnabled = false
+local freeCamConnection = nil
+local freeCamInputConnection = nil
+local freeCamInputEndConnection = nil
+local originalCameraType = nil
+local freeCamRotating = false
+local freeCamKeysDown = {}
+local anchoredParts = {}
 
 local Skeleton_Lines = {}
 
@@ -754,6 +809,20 @@ Options.FogColor:OnChanged(function()
     end
 end)
 
+Toggles.TechnologyEnabled:OnChanged(function()
+    if Toggles.TechnologyEnabled.Value then
+        Lighting.Technology = Enum.Technology[Options.TechnologyValue.Value]
+    else
+        Lighting.Technology = originalLighting.Technology
+    end
+end)
+
+Options.TechnologyValue:OnChanged(function()
+    if Toggles.TechnologyEnabled.Value then
+        Lighting.Technology = Enum.Technology[Options.TechnologyValue.Value]
+    end
+end)
+
 local function setNoClip(state)
     local character = LocalPlayer.Character
     if not character then return end
@@ -819,6 +888,162 @@ local function getGroundPosition(rootPart)
     end
 end
 
+-- Free Cam Functions
+local function startFreeCam()
+    if freeCamEnabled then return end
+    
+    local character = LocalPlayer.Character
+    if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+    
+    -- Store original camera settings
+    originalCameraType = Camera.CameraType
+    
+    -- Set camera to scriptable
+    Camera.CameraType = Enum.CameraType.Scriptable
+    
+    -- Anchor all character parts to prevent movement
+    anchoredParts = {}
+    for _, part in ipairs(character:GetDescendants()) do
+        if part:IsA("BasePart") and not part.Anchored then
+            part.Anchored = true
+            table.insert(anchoredParts, part)
+        end
+    end
+    
+    freeCamEnabled = true
+    freeCamKeysDown = {}
+    freeCamRotating = false
+    
+    -- Input handling for FreeCam
+    freeCamInputConnection = UserInputService.InputBegan:Connect(function(input, gameProcessed)
+        if gameProcessed then return end
+        
+        local keyName = tostring(input.KeyCode)
+        local validKeys = {"Enum.KeyCode.W", "Enum.KeyCode.A", "Enum.KeyCode.S", "Enum.KeyCode.D", "Enum.KeyCode.E", "Enum.KeyCode.Q", "Enum.KeyCode.Space", "Enum.KeyCode.LeftControl"}
+        
+        for _, validKey in pairs(validKeys) do
+            if keyName == validKey then
+                freeCamKeysDown[validKey] = true
+                break
+            end
+        end
+        
+        -- Right mouse button for rotation
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            freeCamRotating = true
+        end
+    end)
+    
+    freeCamInputEndConnection = UserInputService.InputEnded:Connect(function(input, gameProcessed)
+        local keyName = tostring(input.KeyCode)
+        
+        for key, _ in pairs(freeCamKeysDown) do
+            if keyName == key then
+                freeCamKeysDown[key] = false
+                break
+            end
+        end
+        
+        -- Right mouse button release
+        if input.UserInputType == Enum.UserInputType.MouseButton2 then
+            freeCamRotating = false
+        end
+    end)
+    
+    -- Create movement connection
+    freeCamConnection = RunService.RenderStepped:Connect(function()
+        if not freeCamEnabled then return end
+        
+        local speed = Options.FreeCamSpeed.Value / 10 -- Convert to proper speed
+        local sensitivity = 0.3
+        
+        -- Handle rotation with right mouse button
+        if freeCamRotating then
+            local delta = UserInputService:GetMouseDelta()
+            local cf = Camera.CFrame
+            local yAngle = cf:ToEulerAngles(Enum.RotationOrder.YZX)
+            local newAmount = math.deg(yAngle) + delta.Y
+            
+            -- Clamp vertical rotation to prevent flipping
+            if newAmount > 65 or newAmount < -65 then
+                if not (yAngle < 0 and delta.Y < 0) and not (yAngle > 0 and delta.Y > 0) then
+                    delta = Vector2.new(delta.X, 0)
+                end
+            end
+            
+            -- Apply rotation
+            cf = cf * CFrame.Angles(-math.rad(delta.Y), 0, 0)
+            cf = CFrame.Angles(0, -math.rad(delta.X), 0) * (cf - cf.Position) + cf.Position
+            cf = CFrame.lookAt(cf.Position, cf.Position + cf.LookVector)
+            
+            if delta ~= Vector2.new(0, 0) then
+                Camera.CFrame = Camera.CFrame:Lerp(cf, sensitivity)
+            end
+            
+            UserInputService.MouseBehavior = Enum.MouseBehavior.LockCurrentPosition
+        else
+            UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+        end
+        
+        -- Handle movement
+        if freeCamKeysDown["Enum.KeyCode.W"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, 0, -speed))
+        end
+        if freeCamKeysDown["Enum.KeyCode.A"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(-speed, 0, 0))
+        end
+        if freeCamKeysDown["Enum.KeyCode.S"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, 0, speed))
+        end
+        if freeCamKeysDown["Enum.KeyCode.D"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(speed, 0, 0))
+        end
+        if freeCamKeysDown["Enum.KeyCode.E"] or freeCamKeysDown["Enum.KeyCode.Space"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, speed, 0))
+        end
+        if freeCamKeysDown["Enum.KeyCode.Q"] or freeCamKeysDown["Enum.KeyCode.LeftControl"] then
+            Camera.CFrame = Camera.CFrame * CFrame.new(Vector3.new(0, -speed, 0))
+        end
+    end)
+end
+
+local function stopFreeCam()
+    if not freeCamEnabled then return end
+    
+    -- Disconnect all connections
+    if freeCamConnection then
+        freeCamConnection:Disconnect()
+        freeCamConnection = nil
+    end
+    if freeCamInputConnection then
+        freeCamInputConnection:Disconnect()
+        freeCamInputConnection = nil
+    end
+    if freeCamInputEndConnection then
+        freeCamInputEndConnection:Disconnect()
+        freeCamInputEndConnection = nil
+    end
+    
+    -- Restore camera settings
+    if originalCameraType then
+        Camera.CameraType = originalCameraType
+    end
+    
+    -- Reset mouse behavior
+    UserInputService.MouseBehavior = Enum.MouseBehavior.Default
+    
+    -- Unanchor character parts
+    for _, part in ipairs(anchoredParts) do
+        if part and part.Parent then
+            part.Anchored = false
+        end
+    end
+    anchoredParts = {}
+    
+    freeCamEnabled = false
+    freeCamRotating = false
+    freeCamKeysDown = {}
+end
 
 RunService.RenderStepped:Connect(function(deltaTime)
     -- Basic character checks
@@ -917,6 +1142,17 @@ RunService.RenderStepped:Connect(function(deltaTime)
 
     -- NoClip
     setNoClip(Toggles.NoClipEnabled.Value and Options.NoClipKey:GetState())
+    
+    -- Free Cam handling
+    if Toggles.FreeCamEnabled.Value and Options.FreeCamKey:GetState() then
+        if not freeCamEnabled then
+            startFreeCam()
+        end
+    else
+        if freeCamEnabled then
+            stopFreeCam()
+        end
+    end
 end)
 
 -- Key state management
@@ -1214,7 +1450,9 @@ end
 local function createCrosshair()
     -- Clear existing
     for _, part in ipairs(crosshairParts) do
-        part:Remove()
+        if part then
+            part:Remove()
+        end
     end
     crosshairParts = {}
 
@@ -1230,15 +1468,16 @@ local function createCrosshair()
 end
 
 local function updateCrosshair(deltaTime)
+    -- Initialize if needed
+    if #crosshairParts == 0 then createCrosshair() end
+
+    -- First hide all parts if crosshair is disabled
     if not Toggles.CrosshairVisible.Value then
         for _, part in ipairs(crosshairParts) do
             part.Visible = false
         end
         return
     end
-
-    -- Initialize if needed
-    if #crosshairParts == 0 then createCrosshair() end
 
     -- Get cursor position
     local cursorPos = UserInputService:GetMouseLocation()
@@ -1313,10 +1552,12 @@ local function stopCrosshair()
         crosshairConnection = nil
     end
     
-    for _, line in ipairs(crosshairLines) do
-        line:Remove()
+    for _, line in ipairs(crosshairParts) do
+        if line then
+            line:Remove()
+        end
     end
-    crosshairLines = {}
+    crosshairParts = {}
 end
 
 -- Check if player is visible from camera
