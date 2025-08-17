@@ -27,6 +27,7 @@ local LeftGroupBox = Tabs.Main:AddLeftGroupbox('Player Visuals')
 local LightingGroup = Tabs.Main:AddLeftGroupbox('Lighting')
 local CrosshairGroup = Tabs.Main:AddRightGroupbox('Crosshair')
 local MiscGroup = Tabs.Rage:AddRightGroupbox('Misc')
+local CameraGroup = Tabs.Main:AddRightGroupbox('Camera')
 
 -- Services
 local Players = game:GetService("Players")
@@ -51,6 +52,52 @@ local originalLighting = {
 
 -- Store original walk speed
 local originalWalkSpeed = 16
+
+local originalFOV = Camera.FieldOfView
+
+CameraGroup:AddToggle('CameraFOVEnabled', {
+    Text = 'Custom FOV',
+    Default = false,
+    Tooltip = 'Enable custom field of view',
+}):AddKeyPicker('FOVKey', {
+    Default = 'V',
+    SyncToggleState = false,
+    Mode = 'Hold',
+    Text = 'FOV Key',
+    NoUI = false
+})
+
+-- Camera FOV Slider
+CameraGroup:AddSlider('CameraFOVValue', {
+    Text = 'FOV Value',
+    Default = 70,
+    Min = 1,
+    Max = 120,
+    Rounding = 0,
+    Compact = false,
+})
+
+CameraGroup:AddToggle('ZoomEnabled', {
+    Text = 'Zoom',
+    Default = false,
+    Tooltip = 'Toggle zoom functionality',
+}):AddKeyPicker('ZoomKey', {
+    Default = 'Z',
+    SyncToggleState = false,
+    Mode = 'Hold',
+    Text = 'Zoom Key',
+    NoUI = false
+})
+
+-- Zoom Level Slider
+CameraGroup:AddSlider('ZoomLevel', {
+    Text = 'Zoom Level',
+    Default = 30,
+    Min = 1,
+    Max = 100,
+    Rounding = 0,
+    Compact = false,
+})
 
 ManipulationGroup:AddToggle('SpeedEnabled', {
     Text = 'Velocity Speed',
@@ -2588,6 +2635,20 @@ RunService.RenderStepped:Connect(function(deltaTime)
     else
         if freeCamEnabled then
             stopFreeCam()
+        end
+    end
+    
+    -- Camera FOV Control (added this section)
+    if camera then
+        -- Handle FOV changes (only if not in free cam mode)
+        if not freeCamEnabled then
+            if Toggles.CameraFOVEnabled.Value and Options.FOVKey:GetState() then
+                camera.FieldOfView = Options.CameraFOVValue.Value
+            elseif Toggles.ZoomEnabled.Value and Options.ZoomKey:GetState() then
+                camera.FieldOfView = Options.ZoomLevel.Value
+            else
+                camera.FieldOfView = originalFOV
+            end
         end
     end
 end)
