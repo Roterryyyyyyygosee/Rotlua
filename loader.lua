@@ -815,30 +815,32 @@ function espfunctions.add_box(instance)
 
     local box = {}
 
+    -- Outline (thicker border)
     local outline = Drawing.new("Square")
     outline.Thickness = 3
     outline.Filled = false
     outline.Transparency = 1
     outline.Visible = false
 
+    -- Main box (thinner border)
     local fill = Drawing.new("Square")
     fill.Thickness = 1
-    fill.Filled = false
+    outline.Filled = false
     fill.Transparency = 1
     fill.Visible = false
 
-    -- ADD THIS: Box fill square
+    -- Box fill (solid color)
     local boxFill = Drawing.new("Square")
     boxFill.Thickness = 1
-    boxFill.Filled = true -- This one IS filled
-    boxFill.Transparency = 0.5
+    boxFill.Filled = true
+    boxFill.Transparency = 0.5  -- Default transparency
     boxFill.Visible = false
 
     box.outline = outline
     box.fill = fill
-    box.boxFill = boxFill -- ADD THIS LINE
+    box.boxFill = boxFill
 
-    -- Corner lines code stays the same...
+    -- Corner boxes (for corner ESP style)
     box.corner_fill = {}
     box.corner_outline = {}
     for i = 1, 8 do
@@ -1160,96 +1162,101 @@ espRenderConnection = RunService.RenderStepped:Connect(function()
         local min, max, onscreen = get_bounding_box(instance)
 
         if data.box then
-            local box = data.box
+    local box = data.box
 
-            if esplib.box.enabled and onscreen and shouldRender then
-                local x, y = min.X, min.Y
-                local w, h = (max - min).X, (max - min).Y
-                local len = math.min(w, h) * 0.25
+    if esplib.box.enabled and onscreen and shouldRender then
+        local x, y = min.X, min.Y
+        local w, h = (max - min).X, (max - min).Y
+        local len = math.min(w, h) * 0.25
 
-                -- Render box fill FIRST (so it appears behind the outline)
-                if esplib.box.fillEnabled and box.boxFill then
-                    box.boxFill.Position = min
-                    box.boxFill.Size = max - min
-                    box.boxFill.Color = esplib.box.fillColor
-                    box.boxFill.Transparency = 1 - esplib.box.fillTransparency -- Drawing uses inverted transparency
-                    box.boxFill.Visible = true
-                else
-                    if box.boxFill then box.boxFill.Visible = false end
-                end
-
-                if esplib.box.type == "normal" then
-                    box.outline.Position = min
-                    box.outline.Size = max - min
-                    box.outline.Color = esplib.box.outline
-                    box.outline.Visible = true
-
-                    box.fill.Position = min
-                    box.fill.Size = max - min
-                    box.fill.Color = esplib.box.fill
-                    box.fill.Visible = true
-
-                    for _, line in ipairs(box.corner_fill) do
-                        line.Visible = false
-                    end
-                    for _, line in ipairs(box.corner_outline) do
-                        line.Visible = false
-                    end
-
-                elseif esplib.box.type == "corner" then
-                    local fill_lines = box.corner_fill
-                    local outline_lines = box.corner_outline
-                    local fill_color = esplib.box.fill
-                    local outline_color = esplib.box.outline
-
-                    local corners = {
-                        { Vector2.new(x, y), Vector2.new(x + len, y) },
-                        { Vector2.new(x, y), Vector2.new(x, y + len) },
-
-                        { Vector2.new(x + w - len, y), Vector2.new(x + w, y) },
-                        { Vector2.new(x + w, y), Vector2.new(x + w, y + len) },
-
-                        { Vector2.new(x, y + h), Vector2.new(x + len, y + h) },
-                        { Vector2.new(x, y + h - len), Vector2.new(x, y + h) },
-
-                        { Vector2.new(x + w - len, y + h), Vector2.new(x + w, y + h) },
-                        { Vector2.new(x + w, y + h - len), Vector2.new(x + w, y + h) },
-                    }
-
-                    for i = 1, 8 do
-                        local from, to = corners[i][1], corners[i][2]
-                        local dir = (to - from).Unit
-                        local oFrom = from - dir
-                        local oTo = to + dir
-
-                        local o = outline_lines[i]
-                        o.From = oFrom
-                        o.To = oTo
-                        o.Color = outline_color
-                        o.Visible = true
-
-                        local f = fill_lines[i]
-                        f.From = from
-                        f.To = to
-                        f.Color = fill_color
-                        f.Visible = true
-                    end
-
-                    box.outline.Visible = false
-                    box.fill.Visible = false
-                end
-            else
-                box.outline.Visible = false
-                box.fill.Visible = false
-                if box.boxFill then box.boxFill.Visible = false end
-                for _, line in ipairs(box.corner_fill) do
-                    line.Visible = false
-                end
-                for _, line in ipairs(box.corner_outline) do
-                    line.Visible = false
-                end
-            end
+        -- Render box fill (behind the outline)
+        if esplib.box.fillEnabled and box.boxFill then
+            box.boxFill.Position = min
+            box.boxFill.Size = max - min
+            box.boxFill.Color = esplib.box.fillColor
+            box.boxFill.Transparency = 1 - esplib.box.fillTransparency
+            box.boxFill.Visible = true
+        else
+            if box.boxFill then box.boxFill.Visible = false end
         end
+
+        if esplib.box.type == "normal" then
+            -- Normal box ESP
+            box.outline.Position = min
+            box.outline.Size = max - min
+            box.outline.Color = esplib.box.outline
+            box.outline.Visible = true
+
+            box.fill.Position = min
+            box.fill.Size = max - min
+            box.fill.Color = esplib.box.fill
+            box.fill.Visible = true
+
+            -- Hide corner lines
+            for _, line in ipairs(box.corner_fill) do
+                line.Visible = false
+            end
+            for _, line in ipairs(box.corner_outline) do
+                line.Visible = false
+            end
+
+        elseif esplib.box.type == "corner" then
+            -- Corner box ESP
+            local fill_lines = box.corner_fill
+            local outline_lines = box.corner_outline
+            local fill_color = esplib.box.fill
+            local outline_color = esplib.box.outline
+
+            local corners = {
+                { Vector2.new(x, y), Vector2.new(x + len, y) },
+                { Vector2.new(x, y), Vector2.new(x, y + len) },
+
+                { Vector2.new(x + w - len, y), Vector2.new(x + w, y) },
+                { Vector2.new(x + w, y), Vector2.new(x + w, y + len) },
+
+                { Vector2.new(x, y + h), Vector2.new(x + len, y + h) },
+                { Vector2.new(x, y + h - len), Vector2.new(x, y + h) },
+
+                { Vector2.new(x + w - len, y + h), Vector2.new(x + w, y + h) },
+                { Vector2.new(x + w, y + h - len), Vector2.new(x + w, y + h) },
+            }
+
+            for i = 1, 8 do
+                local from, to = corners[i][1], corners[i][2]
+                local dir = (to - from).Unit
+                local oFrom = from - dir
+                local oTo = to + dir
+
+                local o = outline_lines[i]
+                o.From = oFrom
+                o.To = oTo
+                o.Color = outline_color
+                o.Visible = true
+
+                local f = fill_lines[i]
+                f.From = from
+                f.To = to
+                f.Color = fill_color
+                f.Visible = true
+            end
+
+            box.outline.Visible = false
+            box.fill.Visible = false
+            if box.boxFill then box.boxFill.Visible = false end
+        end
+    else
+        -- Hide all box components when not visible
+        box.outline.Visible = false
+        box.fill.Visible = false
+        if box.boxFill then box.boxFill.Visible = false end
+        for _, line in ipairs(box.corner_fill) do
+            line.Visible = false
+        end
+        for _, line in ipairs(box.corner_outline) do
+            line.Visible = false
+        end
+    end
+end
 
         if data.healthbar then
             local outline, fill = data.healthbar.outline, data.healthbar.fill
@@ -1499,6 +1506,16 @@ Toggles.BoxESP:OnChanged(function()
             end
         end
     end
+end)
+
+Toggles.BoxFill:OnChanged(function()
+    esplib.box.fillEnabled = Toggles.BoxFill.Value
+end)
+
+-- Box Fill Color
+Options.BoxFillColor:OnChanged(function()
+    esplib.box.fillColor = Options.BoxFillColor.Value
+    esplib.box.fillTransparency = Options.BoxFillColor.Transparency
 end)
 
 Toggles.HealthBarESP:OnChanged(function()
