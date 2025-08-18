@@ -14,7 +14,7 @@ local Window = Library:CreateWindow({
 })
 
 local Tabs = {
-	Main1 = Window:AddTab('Aimbot'),
+    Main1 = Window:AddTab('Aimbot'),
     Main = Window:AddTab('Visuals'),
     Rage = Window:AddTab('Rage'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
@@ -23,11 +23,12 @@ local Tabs = {
 local LeftGroupBox1 = Tabs.Main1:AddLeftGroupbox('Aimbot')
 local LeftGroupBox2 = Tabs.Main1:AddLeftGroupbox('Field of View')
 local ManipulationGroup = Tabs.Rage:AddLeftGroupbox('Manipulation')
+local PlayerListGroup = Tabs.Rage:AddRightGroupbox('Player Teleport')
 local LeftGroupBox = Tabs.Main:AddLeftGroupbox('Player Visuals')
 local LightingGroup = Tabs.Main:AddLeftGroupbox('Lighting')
 local CrosshairGroup = Tabs.Main:AddRightGroupbox('Crosshair')
+local RightGroupBox = Tabs.Main:AddRightGroupbox('Camera')
 local MiscGroup = Tabs.Rage:AddRightGroupbox('Misc')
-local CameraGroup = Tabs.Main:AddRightGroupbox('Camera')
 
 -- Services
 local Players = game:GetService("Players")
@@ -50,25 +51,123 @@ local originalLighting = {
     Technology = Lighting.Technology
 }
 
+-- Store original camera values
+local originalCamera = {
+    FieldOfView = Camera.FieldOfView
+}
+
 -- Store original walk speed
 local originalWalkSpeed = 16
 
-local originalFOV = Camera.FieldOfView
+-- Player Teleport Functions
+local function updatePlayerList()
+    local newPlayers = {}
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer then
+            table.insert(newPlayers, player.Name)
+        end
+    end
+    Options.PlayerDropdown:SetValues(newPlayers)
+    if #newPlayers > 0 then
+        Options.PlayerDropdown:SetValue(newPlayers[1])
+    end
+end
 
-CameraGroup:AddToggle('CameraFOVEnabled', {
+-- Create player dropdown
+PlayerListGroup:AddDropdown('PlayerDropdown', {
+    Values = {},
+    Default = 1,
+    Text = 'Select Player',
+    Tooltip = 'Choose a player to teleport to',
+})
+
+-- Initialize player list
+updatePlayerList()
+
+-- Update player list when a player joins/leaves
+Players.PlayerAdded:Connect(updatePlayerList)
+Players.PlayerRemoving:Connect(updatePlayerList)
+
+-- Add teleport button
+PlayerListGroup:AddButton({
+    Text = 'Teleport',
+    Func = function()
+        local selectedPlayerName = Options.PlayerDropdown.Value
+        local targetPlayer = Players:FindFirstChild(selectedPlayerName)
+        
+        if not targetPlayer then
+            Library:Notify("Player not found: " .. selectedPlayerName)
+            updatePlayerList()
+            return
+        end
+        
+        if targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
+            local character = LocalPlayer.Character
+            if character and character:FindFirstChild("HumanoidRootPart") then
+                character.HumanoidRootPart.CFrame = targetPlayer.Character.HumanoidRootPart.CFrame
+                Library:Notify('Teleported to ' .. targetPlayer.Name)
+            else
+                Library:Notify('Error: Your character not found')
+            end
+        else
+            Library:Notify('Error: Target player character not found')
+        end
+    end,
+    DoubleClick = false,
+    Tooltip = 'Teleport to selected player'
+})
+
+-- Add spectate button
+PlayerListGroup:AddButton({
+    Text = 'Spectate',
+    Func = function()
+        local selectedPlayerName = Options.PlayerDropdown.Value
+        local targetPlayer = Players:FindFirstChild(selectedPlayerName)
+        
+        if not targetPlayer then
+            Library:Notify("Player not found: " .. selectedPlayerName)
+            updatePlayerList()
+            return
+        end
+        
+        if targetPlayer.Character then
+            Camera.CameraSubject = targetPlayer.Character:FindFirstChildOfClass("Humanoid") or targetPlayer.Character:FindFirstChildOfClass("BasePart")
+            Library:Notify('Now spectating ' .. targetPlayer.Name)
+        else
+            Library:Notify('Error: Target player character not found')
+        end
+    end,
+    DoubleClick = false,
+    Tooltip = 'Spectate selected player'
+})
+
+-- Add unspectate button
+PlayerListGroup:AddButton({
+    Text = 'Unspectate',
+    Func = function()
+        if LocalPlayer.Character then
+            Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid") or LocalPlayer.Character:FindFirstChildOfClass("BasePart")
+            Library:Notify('Stopped spectating')
+        end
+    end,
+    DoubleClick = false,
+    Tooltip = 'Stop spectating and return to your character'
+})
+
+-- Camera Group
+RightGroupBox:AddToggle('CameraFOVEnabled', { -- Changed name to avoid conflict
     Text = 'Custom FOV',
     Default = false,
-    Tooltip = 'Enable custom field of view',
-}):AddKeyPicker('FOVKey', {
-    Default = 'V',
+    Tooltip = 'Override the camera field of view',
+}):AddKeyPicker('CameraFOVKey', {
+    Default = 'None',
     SyncToggleState = false,
-    Mode = 'Hold',
+    Mode = 'Toggle', -- Changed to Toggle mode
     Text = 'FOV Key',
     NoUI = false
 })
 
--- Camera FOV Slider
-CameraGroup:AddSlider('CameraFOVValue', {
+RightGroupBox:AddSlider('CameraFOVValue', { -- Changed name to avoid conflict
     Text = 'FOV Value',
     Default = 70,
     Min = 1,
@@ -77,21 +176,20 @@ CameraGroup:AddSlider('CameraFOVValue', {
     Compact = false,
 })
 
-CameraGroup:AddToggle('ZoomEnabled', {
+RightGroupBox:AddToggle('ZoomEnabled', {
     Text = 'Zoom',
     Default = false,
-    Tooltip = 'Toggle zoom functionality',
+    Tooltip = 'Zoom in/out the camera',
 }):AddKeyPicker('ZoomKey', {
-    Default = 'Z',
+    Default = 'None',
     SyncToggleState = false,
     Mode = 'Hold',
     Text = 'Zoom Key',
     NoUI = false
 })
 
--- Zoom Level Slider
-CameraGroup:AddSlider('ZoomLevel', {
-    Text = 'Zoom Level',
+RightGroupBox:AddSlider('ZoomValue', {
+    Text = 'Zoom Value',
     Default = 30,
     Min = 1,
     Max = 100,
@@ -103,7 +201,7 @@ ManipulationGroup:AddToggle('SpeedEnabled', {
     Text = 'Velocity Speed',
     Default = false,
 }):AddKeyPicker('SpeedKey', {
-    Default = 'LeftShift', -- example
+    Default = 'None', -- example
     SyncToggleState = false,
     Mode = 'Hold',
     Text = 'CFrame Speed Key',
@@ -123,7 +221,7 @@ ManipulationGroup:AddToggle('WalkSpeedEnabled', {
     Text = 'Walk Speed',
     Default = false,
 }):AddKeyPicker('WalkSpeedKey', {
-    Default = 'T',
+    Default = 'None',
     SyncToggleState = false,
     Mode = 'Hold',
     Text = 'Walk Speed Key',
@@ -144,7 +242,7 @@ ManipulationGroup:AddToggle('JumpPowerEnabled', {
     Default = false,
     Tooltip = 'Modify jump height',
 }):AddKeyPicker('JumpPowerKey', {
-    Default = 'Space', -- Default to spacebar
+    Default = 'None', -- Default to spacebar
     SyncToggleState = false,
     Mode = 'Toggle',
     Text = 'Jump Power Key',
@@ -165,7 +263,7 @@ ManipulationGroup:AddToggle('FlyEnabled', {
     Text = 'Fly',
     Default = false,
 }):AddKeyPicker('FlyKey', {
-    Default = 'F', -- example
+    Default = 'None', -- example
     SyncToggleState = false,
     Mode = 'Hold',
     Text = 'Fly Key',
@@ -186,7 +284,7 @@ ManipulationGroup:AddToggle('NoClipEnabled', {
     Text = 'No Clip',
     Default = false,
 }):AddKeyPicker('NoClipKey', {
-    Default = 'N', -- example
+    Default = 'None', -- example
     SyncToggleState = false,
     Mode = 'Hold',
     Text = 'No Clip Key',
@@ -197,7 +295,7 @@ ManipulationGroup:AddToggle('BunnyHopEnabled', {
     Text = 'Bunny hop ',
     Default = false,
 }):AddKeyPicker('BunnyHopKey', {
-    Default = 'G', -- example
+    Default = 'None', -- example
     SyncToggleState = false,
     Mode = 'Hold',
     Text = 'Bunnyhop key',
@@ -218,7 +316,7 @@ ManipulationGroup:AddToggle('HipHeightEnabled', {
     Default = false,
     Tooltip = 'Hipheight',
 }):AddKeyPicker('HipHeightKey', {
-    Default = 'LeftControl',
+    Default = 'None',
     SyncToggleState = false,
     Mode = 'Hold',
     Text = 'Crouch Key',
@@ -240,7 +338,7 @@ MiscGroup:AddToggle('FreeCamEnabled', {
     Default = false,
     Tooltip = 'Allows camera to move freely while anchoring player',
 }):AddKeyPicker('FreeCamKey', {
-    Default = 'C', -- Default keybind
+    Default = 'None', -- Default keybind
     SyncToggleState = false,
     Mode = 'Toggle',
     Text = 'Free Cam Key',
@@ -257,11 +355,11 @@ MiscGroup:AddSlider('FreeCamSpeed', {
 })
 
 LeftGroupBox1:AddToggle('AimbotEnabled', {
-	Text = 'Aimbot',
-	Default = false,
-	Tooltip = 'Enables aimbot',
+    Text = 'Aimbot',
+    Default = false,
+    Tooltip = 'Enables aimbot',
 }):AddKeyPicker('KeyPicker', {
-    Default = 'MB2',
+    Default = 'None',
     SyncToggleState = false,
     Mode = 'Hold',
     Text = 'Aimbot Key',
@@ -319,9 +417,9 @@ LeftGroupBox1:AddDropdown('AimbotCheck', {
 })
 
 LeftGroupBox1:AddToggle('StickyAim', {
-	Text = 'Sticky Aim',
-	Default = false,
-	Tooltip = 'Keeps aiming at target until key released',
+    Text = 'Sticky Aim',
+    Default = false,
+    Tooltip = 'Keeps aiming at target until key released',
 })
 
 LeftGroupBox1:AddSlider('AimSmoothing', {
@@ -788,7 +886,7 @@ local pulseProgress = 0
 local pulseDirection = 1
 local pulseSpeed = 1
 local pulseRestartDelay = 0.2 -- Short delay before restarting pulse
-local pulseDelayTimer = 0	
+local pulseDelayTimer = 0    
 local currentPulseDirection = "Outward" -- Track current direction
 
 -- Crosshair Variables
@@ -826,7 +924,7 @@ local esplib = {
         padding = 1.15,
         fill = Color3.new(1,1,1),
         outline = Color3.new(0,0,0),
-		fillEnabled = false,
+        fillEnabled = false,
         fillColor = Color3.new(1,0,0), 
         fillTransparency = 0.5,
     },
@@ -862,32 +960,30 @@ function espfunctions.add_box(instance)
 
     local box = {}
 
-    -- Outline (thicker border)
     local outline = Drawing.new("Square")
     outline.Thickness = 3
     outline.Filled = false
     outline.Transparency = 1
     outline.Visible = false
 
-    -- Main box (thinner border)
     local fill = Drawing.new("Square")
     fill.Thickness = 1
-    outline.Filled = false
+    fill.Filled = false
     fill.Transparency = 1
     fill.Visible = false
 
-    -- Box fill (solid color)
+    -- Box fill square
     local boxFill = Drawing.new("Square")
     boxFill.Thickness = 1
     boxFill.Filled = true
-    boxFill.Transparency = 0.5  -- Default transparency
+    boxFill.Transparency = 0.5
     boxFill.Visible = false
 
     box.outline = outline
     box.fill = fill
     box.boxFill = boxFill
 
-    -- Corner boxes (for corner ESP style)
+    -- Corner lines code stays the same...
     box.corner_fill = {}
     box.corner_outline = {}
     for i = 1, 8 do
@@ -1209,101 +1305,96 @@ espRenderConnection = RunService.RenderStepped:Connect(function()
         local min, max, onscreen = get_bounding_box(instance)
 
         if data.box then
-    local box = data.box
+            local box = data.box
 
-    if esplib.box.enabled and onscreen and shouldRender then
-        local x, y = min.X, min.Y
-        local w, h = (max - min).X, (max - min).Y
-        local len = math.min(w, h) * 0.25
+            if esplib.box.enabled and onscreen and shouldRender then
+                local x, y = min.X, min.Y
+                local w, h = (max - min).X, (max - min).Y
+                local len = math.min(w, h) * 0.25
 
-        -- Render box fill (behind the outline)
-        if esplib.box.fillEnabled and box.boxFill then
-            box.boxFill.Position = min
-            box.boxFill.Size = max - min
-            box.boxFill.Color = esplib.box.fillColor
-            box.boxFill.Transparency = 1 - esplib.box.fillTransparency
-            box.boxFill.Visible = true
-        else
-            if box.boxFill then box.boxFill.Visible = false end
-        end
+                -- Render box fill FIRST (so it appears behind the outline)
+                if esplib.box.fillEnabled and box.boxFill then
+                    box.boxFill.Position = min
+                    box.boxFill.Size = max - min
+                    box.boxFill.Color = esplib.box.fillColor
+                    box.boxFill.Transparency = esplib.box.fillTransparency -- Drawing uses inverted transparency
+                    box.boxFill.Visible = true
+                else
+                    if box.boxFill then box.boxFill.Visible = false end
+                end
 
-        if esplib.box.type == "normal" then
-            -- Normal box ESP
-            box.outline.Position = min
-            box.outline.Size = max - min
-            box.outline.Color = esplib.box.outline
-            box.outline.Visible = true
+                if esplib.box.type == "normal" then
+                    box.outline.Position = min
+                    box.outline.Size = max - min
+                    box.outline.Color = esplib.box.outline
+                    box.outline.Visible = true
 
-            box.fill.Position = min
-            box.fill.Size = max - min
-            box.fill.Color = esplib.box.fill
-            box.fill.Visible = true
+                    box.fill.Position = min
+                    box.fill.Size = max - min
+                    box.fill.Color = esplib.box.fill
+                    box.fill.Visible = true
 
-            -- Hide corner lines
-            for _, line in ipairs(box.corner_fill) do
-                line.Visible = false
+                    for _, line in ipairs(box.corner_fill) do
+                        line.Visible = false
+                    end
+                    for _, line in ipairs(box.corner_outline) do
+                        line.Visible = false
+                    end
+
+                elseif esplib.box.type == "corner" then
+                    local fill_lines = box.corner_fill
+                    local outline_lines = box.corner_outline
+                    local fill_color = esplib.box.fill
+                    local outline_color = esplib.box.outline
+
+                    local corners = {
+                        { Vector2.new(x, y), Vector2.new(x + len, y) },
+                        { Vector2.new(x, y), Vector2.new(x, y + len) },
+
+                        { Vector2.new(x + w - len, y), Vector2.new(x + w, y) },
+                        { Vector2.new(x + w, y), Vector2.new(x + w, y + len) },
+
+                        { Vector2.new(x, y + h), Vector2.new(x + len, y + h) },
+                        { Vector2.new(x, y + h - len), Vector2.new(x, y + h) },
+
+                        { Vector2.new(x + w - len, y + h), Vector2.new(x + w, y + h) },
+                        { Vector2.new(x + w, y + h - len), Vector2.new(x + w, y + h) },
+                    }
+
+                    for i = 1, 8 do
+                        local from, to = corners[i][1], corners[i][2]
+                        local dir = (to - from).Unit
+                        local oFrom = from - dir
+                        local oTo = to + dir
+
+                        local o = outline_lines[i]
+                        o.From = oFrom
+                        o.To = oTo
+                        o.Color = outline_color
+                        o.Visible = true
+
+                        local f = fill_lines[i]
+                        f.From = from
+                        f.To = to
+                        f.Color = fill_color
+                        f.Visible = true
+                    end
+
+                    box.outline.Visible = false
+                    box.fill.Visible = false
+                end
+            else
+                box.outline.Visible = false
+                box.fill.Visible = false
+                if box.boxFill then box.boxFill.Visible = false end
+                for _, line in ipairs(box.corner_fill) do
+                    line.Visible = false
+                end
+                for _, line in ipairs(box.corner_outline) do
+                    line.Visible = false
+                end
             end
-            for _, line in ipairs(box.corner_outline) do
-                line.Visible = false
-            end
-
-        elseif esplib.box.type == "corner" then
-            -- Corner box ESP
-            local fill_lines = box.corner_fill
-            local outline_lines = box.corner_outline
-            local fill_color = esplib.box.fill
-            local outline_color = esplib.box.outline
-
-            local corners = {
-                { Vector2.new(x, y), Vector2.new(x + len, y) },
-                { Vector2.new(x, y), Vector2.new(x, y + len) },
-
-                { Vector2.new(x + w - len, y), Vector2.new(x + w, y) },
-                { Vector2.new(x + w, y), Vector2.new(x + w, y + len) },
-
-                { Vector2.new(x, y + h), Vector2.new(x + len, y + h) },
-                { Vector2.new(x, y + h - len), Vector2.new(x, y + h) },
-
-                { Vector2.new(x + w - len, y + h), Vector2.new(x + w, y + h) },
-                { Vector2.new(x + w, y + h - len), Vector2.new(x + w, y + h) },
-            }
-
-            for i = 1, 8 do
-                local from, to = corners[i][1], corners[i][2]
-                local dir = (to - from).Unit
-                local oFrom = from - dir
-                local oTo = to + dir
-
-                local o = outline_lines[i]
-                o.From = oFrom
-                o.To = oTo
-                o.Color = outline_color
-                o.Visible = true
-
-                local f = fill_lines[i]
-                f.From = from
-                f.To = to
-                f.Color = fill_color
-                f.Visible = true
-            end
-
-            box.outline.Visible = false
-            box.fill.Visible = false
-            if box.boxFill then box.boxFill.Visible = false end
         end
-    else
-        -- Hide all box components when not visible
-        box.outline.Visible = false
-        box.fill.Visible = false
-        if box.boxFill then box.boxFill.Visible = false end
-        for _, line in ipairs(box.corner_fill) do
-            line.Visible = false
-        end
-        for _, line in ipairs(box.corner_outline) do
-            line.Visible = false
-        end
-    end
-end
 
         if data.healthbar then
             local outline, fill = data.healthbar.outline, data.healthbar.fill
@@ -1457,6 +1548,7 @@ local function playerRemoving(player)
         if espinstances[player.Character].box then
             espinstances[player.Character].box.outline:Remove()
             espinstances[player.Character].box.fill:Remove()
+            if espinstances[player.Character].box.boxFill then espinstances[player.Character].box.boxFill:Remove() end
             for _, line in ipairs(espinstances[player.Character].box.corner_fill) do
                 line:Remove()
             end
@@ -1517,6 +1609,7 @@ Toggles.ESPEnabled:OnChanged(function()
             if data.box then
                 data.box.outline:Remove()
                 data.box.fill:Remove()
+                if data.box.boxFill then data.box.boxFill:Remove() end
                 for _, line in ipairs(data.box.corner_fill) do
                     line:Remove()
                 end
@@ -1553,16 +1646,6 @@ Toggles.BoxESP:OnChanged(function()
             end
         end
     end
-end)
-
-Toggles.BoxFill:OnChanged(function()
-    esplib.box.fillEnabled = Toggles.BoxFill.Value
-end)
-
--- Box Fill Color
-Options.BoxFillColor:OnChanged(function()
-    esplib.box.fillColor = Options.BoxFillColor.Value
-    esplib.box.fillTransparency = Options.BoxFillColor.Transparency
 end)
 
 Toggles.HealthBarESP:OnChanged(function()
@@ -1612,6 +1695,15 @@ end)
 -- ESP Color and Style Handlers
 Options.BoxESPColor:OnChanged(function()
     esplib.box.fill = Options.BoxESPColor.Value
+end)
+
+Toggles.BoxFill:OnChanged(function()
+    esplib.box.fillEnabled = Toggles.BoxFill.Value and Toggles.ESPEnabled.Value
+end)
+
+Options.BoxFillColor:OnChanged(function()
+    esplib.box.fillColor = Options.BoxFillColor.Value
+    esplib.box.fillTransparency = Options.BoxFillColor.Transparency
 end)
 
 Options.HealthBarColor:OnChanged(function()
@@ -2526,6 +2618,49 @@ local function stopFreeCam()
     freeCamKeysDown = {}
 end
 
+-- Camera FOV and Zoom Functions
+local function updateCameraFOV()
+    -- Priority: Zoom (hold) > Custom FOV (toggle) > Original
+    
+    -- Check if zoom is enabled and key is being held
+    if Toggles.ZoomEnabled and Toggles.ZoomEnabled.Value and Options.ZoomKey and Options.ZoomKey:GetState() then
+        Camera.FieldOfView = Options.ZoomValue.Value
+        return
+    end
+    
+    -- Check if custom FOV is enabled and either always on or key is pressed
+    if Toggles.CameraFOVEnabled and Toggles.CameraFOVEnabled.Value then
+        -- If no key is set or key mode is "Always", apply FOV
+        if not Options.CameraFOVKey.Value or Options.CameraFOVKey.Value == "None" then
+            Camera.FieldOfView = Options.CameraFOVValue.Value
+            return
+        end
+        
+        -- If key is set and in toggle mode, check if it's active
+        if Options.CameraFOVKey:GetState() then
+            Camera.FieldOfView = Options.CameraFOVValue.Value
+            return
+        end
+    end
+    
+    -- Default: restore original FOV
+    Camera.FieldOfView = originalCamera.FieldOfView
+end
+
+-- Add this event handler for the FOV toggle:
+Toggles.CameraFOVEnabled:OnChanged(function()
+    -- Update FOV immediately when toggle changes
+    updateCameraFOV()
+end)
+
+-- Add this event handler for the FOV slider:
+Options.CameraFOVValue:OnChanged(function()
+    -- Update FOV immediately when value changes
+    if Toggles.CameraFOVEnabled and Toggles.CameraFOVEnabled.Value then
+        updateCameraFOV()
+    end
+end)
+
 RunService.RenderStepped:Connect(function(deltaTime)
     -- Basic character checks
     local character = LocalPlayer.Character
@@ -2538,6 +2673,8 @@ RunService.RenderStepped:Connect(function(deltaTime)
     local camera = workspace.CurrentCamera
     local defaultJumpPower = 50
     local defaultHipHeight = 3.0
+
+    updateCameraFOV()
 
     -- Jump Power (Toggle)
     if Toggles.JumpPowerEnabled.Value then
@@ -2635,20 +2772,6 @@ RunService.RenderStepped:Connect(function(deltaTime)
     else
         if freeCamEnabled then
             stopFreeCam()
-        end
-    end
-    
-    -- Camera FOV Control (added this section)
-    if camera then
-        -- Handle FOV changes (only if not in free cam mode)
-        if not freeCamEnabled then
-            if Toggles.CameraFOVEnabled.Value and Options.FOVKey:GetState() then
-                camera.FieldOfView = Options.CameraFOVValue.Value
-            elseif Toggles.ZoomEnabled.Value and Options.ZoomKey:GetState() then
-                camera.FieldOfView = Options.ZoomLevel.Value
-            else
-                camera.FieldOfView = originalFOV
-            end
         end
     end
 end)
