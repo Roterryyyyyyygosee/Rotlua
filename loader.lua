@@ -37,64 +37,123 @@ do
         end;
 
         ImGui.SetNextWindowSize(vector2_new(620, 400));
-        ImGui.Begin(library.name .. "###" .. noise, nil, ImGuiWindowFlags_NoTitleBar + ImGuiWindowFlags_NoResize + ImGuiWindowFlags_NoScrollbar --[[+ 0x2000000]]); -- ImGuiWindowFlags_NoDocking
+        ImGui.Begin(
+            library.name .. "###" .. noise,
+            nil,
+            ImGuiWindowFlags_NoTitleBar +
+                ImGuiWindowFlags_NoResize +
+                ImGuiWindowFlags_NoScrollbar
+        );
 
         local tab_list = internal.tab_list;
 
-        -- render tab buttons
         do
             local amount = #tab_list;
 
-            local offset = 0;
             for i = 1, amount do
                 local tab = tab_list[i];
+                local selected = internal.tab == i;
 
-                offset += ImGui.CalcTextSize(1, 13, tab.name).X+16;
-                if ImGui.Button(tab.name) then
+                if selected then
+                    ImGui.PushStyleColor(
+                        ImGuiCol_Button,
+                        color3_new(0.28, 0.28, 0.28)
+                    );
+                    ImGui.PushStyleColor(
+                        ImGuiCol_ButtonHovered,
+                        color3_new(0.35, 0.35, 0.35)
+                    );
+                    ImGui.PushStyleColor(
+                        ImGuiCol_ButtonActive,
+                        color3_new(0.40, 0.40, 0.40)
+                    );
+                end;
+
+                if ImGui.Button(tab.name, vector2_new(70, 22)) then
                     internal.tab = i;
                     internal.group = 1;
                 end;
 
-                if i == amount then continue end;
-                ImGui.SameLine();
+                if selected then
+                    ImGui.PopStyleColor(3);
+                end;
+
+                if i ~= amount then
+                    ImGui.SameLine();
+                end;
             end;
         end;
-        
+
         local window_size = ImGui.GetWindowSize();
         local y_size = window_size.Y - 45;
 
-        ImGui.SameLine(window_size.X - (10+ImGui.CalcTextSize(1, 13, library.name).X));
+        ImGui.SameLine(
+            window_size.X -
+                (10 + ImGui.CalcTextSize(1, 13, library.name).X)
+        );
         ImGui.Text(library.name);
 
         local tab = tab_list[internal.tab];
 
-        if (ImGui.BeginChild("Data##" .. noise, vector2_new(window_size.X - 20, y_size), ImGuiChildFlags_Border)) then
+        if (
+            ImGui.BeginChild(
+                "Data##" .. noise,
+                vector2_new(window_size.X - 20, y_size),
+                ImGuiChildFlags_Border
+            )
+        ) then
+            local groups = tab.data;
 
-    local groups = tab.data
+            for i = 1, #groups do
+                local selected = internal.group == i;
 
-    for i = 1, #groups do
-        local selected = internal.group == i
+                if selected then
+                    ImGui.PushStyleColor(
+                        ImGuiCol_Button,
+                        color3_new(0.28, 0.28, 0.28)
+                    );
+                    ImGui.PushStyleColor(
+                        ImGuiCol_ButtonHovered,
+                        color3_new(0.35, 0.35, 0.35)
+                    );
+                    ImGui.PushStyleColor(
+                        ImGuiCol_ButtonActive,
+                        color3_new(0.40, 0.40, 0.40)
+                    );
+                end;
 
-        if i > 1 then
-            ImGui.SameLine()
-        end
+                local size = ImGui.CalcTextSize(
+                    1,
+                    13,
+                    groups[i].name
+                );
 
-        local drawn, clicked = ImGui.Selectable(groups[i].name, selected)
-        if clicked then
-            internal.group = i
-        end
-    end
+                if ImGui.Button(
+                    groups[i].name,
+                    vector2_new(size.X + 18, 22)
+                ) then
+                    internal.group = i;
+                end;
 
-    ImGui.Separator()
+                if selected then
+                    ImGui.PopStyleColor(3);
+                end;
 
-    local group = groups[internal.group]
-    if group then
-        group.callback()
-    end
+                if i ~= #groups then
+                    ImGui.SameLine();
+                end;
+            end;
 
-end
-ImGui.EndChild()
+            ImGui.NewLine();
+            ImGui.Separator();
 
+            local group = groups[internal.group];
+            if group then
+                group.callback();
+            end;
+        end;
+
+        ImGui.EndChild();
         ImGui.End();
     end;
 
