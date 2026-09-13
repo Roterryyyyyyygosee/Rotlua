@@ -4913,13 +4913,66 @@ local function SF(key, label, min, max, fmt)
     UD[key] = library.slider_float(label, min, max, UD[key], fmt)
 end
 
+local HAS_COMBO = type(ImGui) == "table"
+    and type(ImGui.BeginCombo) == "function"
+    and type(ImGui.Selectable) == "function"
+    and type(ImGui.EndCombo) == "function"
+
+-- raw single-select dropdown (fallback if the lib's dropdown ever fails).
+-- mutates opts in place exactly like library.dropdown does.
+local function raw_dropdown(label, opts)
+    local text = label:match("^(.-)##") or label
+    if text ~= "" then
+        library.text(text)
+    end
+    local cur = nil
+    for _, o in ipairs(opts) do
+        if o[2] then
+            cur = o[1]
+            break
+        end
+    end
+    cur = cur or ""
+    local ok, open = pcall(ImGui.BeginCombo, "##rd_" .. label, cur)
+    if ok and open then
+        for _, o in ipairs(opts) do
+            local ok2, _, clicked = pcall(ImGui.Selectable, o[1], o[2])
+            if ok2 and clicked then
+                for _, p in ipairs(opts) do
+                    p[2] = (p == o)
+                end
+            end
+        end
+        pcall(ImGui.EndCombo)
+    end
+end
+
+local USE_RAW_DD = false
+local function lib_dropdown(label, opts)
+    if not USE_RAW_DD and type(library.dropdown) == "function" then
+        local ok, err = pcall(library.dropdown, label, opts)
+        if ok then
+            return true
+        end
+        USE_RAW_DD = true
+        local tb = ""
+        pcall(function() tb = debug.traceback("dropdown failure", 2) end)
+        warn("[UDHUB] lib dropdown failed, raw fallback on. label=" .. tostring(label) .. " err=" .. tostring(err) .. " " .. tostring(tb))
+    end
+    return false
+end
+
 local function DD(key, label)
-    library.dropdown(label, UDOPTS[key])
+    if not lib_dropdown(label, UDOPTS[key]) and HAS_COMBO then
+        raw_dropdown(label, UDOPTS[key])
+    end
     UD[key] = selected_name(UDOPTS[key])
 end
 
 local function KEYDD(bind)
-    library.dropdown("Key##" .. bind.id, bind.opts)
+    if not lib_dropdown("Key##" .. bind.id, bind.opts) and HAS_COMBO then
+        raw_dropdown("Key##" .. bind.id, bind.opts)
+    end
 end
 
 local function COL3(key, label)
