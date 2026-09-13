@@ -1383,21 +1383,21 @@ local UDCOL = {
     ["Silent Aim%%Dead FOV Circle Color"] = { color = Color3.new(1, 1, 1) },
     ["Hit Boxes%%Color"] = { color = Color3.new(0.1, 0.1, 1) },
     ["Backtracking%%Character Color"] = { color = Color3.new(0.1, 0.1, 1) },
-    ["Enemy ESP%%Box Color"] = { color = Color3.fromRGB(0, 255, 255) },
+    ["Enemy ESP%%Box Color"] = { color = Color3.new(1, 0, 0) },
     ["Enemy ESP%%Box Outline Color"] = { color = Color3.fromRGB(0, 0, 0) },
-    ["Enemy ESP%%Box Inside Color"] = { color = Color3.fromRGB(0, 255, 255) },
+    ["Enemy ESP%%Box Inside Color"] = { color = Color3.new(1, 0, 0) },
     ["Enemy ESP%%Damage Color"] = { color = Color3.fromRGB(255, 0, 0) },
     ["Enemy ESP%%Health Color"] = { color = Color3.fromRGB(0, 255, 0) },
     ["Enemy ESP%%Health Outline Color"] = { color = Color3.fromRGB(0, 0, 0) },
-    ["Enemy ESP%%Tracer Color"] = { color = Color3.fromRGB(0, 255, 255) },
+    ["Enemy ESP%%Tracer Color"] = { color = Color3.new(1, 0, 0) },
     ["Enemy ESP%%Tracer Outline Color"] = { color = Color3.fromRGB(0, 0, 0) },
     ["Enemy ESP%%Names Color"] = { color = Color3.fromRGB(255, 255, 255) },
     ["Enemy ESP%%Weapons Color"] = { color = Color3.fromRGB(255, 255, 255) },
     ["Enemy ESP%%Distances Color"] = { color = Color3.fromRGB(255, 255, 255) },
     ["Enemy ESP%%Health Number Color"] = { color = Color3.fromRGB(255, 255, 255) },
     ["Enemy ESP%%Text Outline Color"] = { color = Color3.fromRGB(0, 0, 0) },
-    ["Enemy ESP%%Highlight Outline Color"] = { color = Color3.fromRGB(0, 0, 0) },
-    ["Enemy ESP%%Highlight Fill Color"] = { color = Color3.fromRGB(0, 0, 255) },
+    ["Enemy ESP%%Highlight Outline Color"] = { color = Color3.new(1, 0, 0) },
+    ["Enemy ESP%%Highlight Fill Color"] = { color = Color3.new(0.2, 0.2, 0.2) },
     ["Chams%%Arm Color"] = { color = Color3.new(0.1, 0.1, 1) },
     ["Chams%%Gun Color"] = { color = Color3.new(0.1, 0.1, 1) },
     ["More Chams%%Character Color"] = { color = Color3.new(0.1, 0.1, 1) },
@@ -3736,7 +3736,25 @@ LPH_JIT_MAX(function() -- Main Cheat
         end
     end)
 
-    local espInterface = loadstring(game:HttpGet("https://raw.githubusercontent.com/jensonhirst/Sirius/refs/heads/request/library/sense/source.lua"))()
+    local espInterface = (function()
+        local src = game:HttpGet("https://raw.githubusercontent.com/jensonhirst/Sirius/refs/heads/request/library/sense/source.lua")
+        local patched = src:gsub("name%.Font = interface%.sharedSettings%.textFont;", "name.Font = interface.sharedSettings.nameFont or interface.sharedSettings.textFont;")
+        if not patched:find("nameFont", 1, true) then
+            warn("[UDHUB] sense nameFont patch missed - names will use the regular font")
+        end
+        return loadstring(patched)()
+    end)()
+    pcall(function()
+        local bold = DrawFont.Register(readfile("fonts/tahoma_bold.ttf"), { PixelSize = 18 })
+        local reg = DrawFont.Register(readfile("fonts/Tahoma.ttf"), { PixelSize = 18 })
+        if bold then
+            espInterface.sharedSettings.nameFont = bold
+        end
+        if reg then
+            espInterface.sharedSettings.textFont = reg
+        end
+        espInterface.sharedSettings.textSize = 18
+    end)
     espInterface.teamSettings = {
         enemy = {
             enabled = true,
@@ -4896,6 +4914,22 @@ local function COL3(key, label)
     library.color_picker3(label, UDCOL[key])
 end
 
+local function TC(key, label, colors)
+    T(key, label)
+    for _, c in ipairs(colors) do
+        library.same_line()
+        COL3(c[1], c[2])
+    end
+end
+
+local function TKEYC(key, label, bindid, colors)
+    TC(key, label, colors)
+    local b = bind_of(bindid)
+    if b then
+        KEYDD(b)
+    end
+end
+
 local function ud_button(label)
     if HAS_BUTTON then
         local ok, clicked = pcall(ImGui.Button, label)
@@ -4948,11 +4982,11 @@ library.add_group(LegitTab, "Aimbot", function()
     DD("Aim Bot%%Target Part", "Target Part##ab_part")
     T("Aim Bot%%Use FOV", "Use FOV##ab_usefov")
     SI("Aim Bot%%FOV Radius", "FOV Radius##ab_fov", 2, 1000, "%ipx")
-    TKEY("Aim Bot%%Show FOV Circle", "Show FOV Circle##ab_show", "ab_fovkey")
+    TKEYC("Aim Bot%%Show FOV Circle", "Show FOV Circle##ab_show", "ab_fovkey", {{"Aim Bot%%FOV Circle Color", "FOV Color##ab_fovc"}})
     COL3("Aim Bot%%FOV Circle Color", "FOV Color##ab_fovc")
     T("Aim Bot%%Use Dead FOV", "Use Dead FOV##ab_used")
     SI("Aim Bot%%Dead FOV Radius", "Dead FOV Radius##ab_dfov", 1, 1000, "%ipx")
-    TKEY("Aim Bot%%Show Dead FOV Circle", "Show Dead FOV##ab_showd", "ab_dfovkey")
+    TKEYC("Aim Bot%%Show Dead FOV Circle", "Show Dead FOV##ab_showd", "ab_dfovkey", {{"Aim Bot%%Dead FOV Circle Color", "Dead FOV Color##ab_dfovc"}})
     COL3("Aim Bot%%Dead FOV Circle Color", "Dead FOV Color##ab_dfovc")
 end)
 
@@ -4970,11 +5004,11 @@ library.add_group(LegitTab, "Silent", function()
     SI("Silent Aim%%Head Shot Chance", "Head Shot Chance##si_hs", 0, 100, "%i%%")
     T("Silent Aim%%Use FOV", "Use FOV##si_usefov")
     SI("Silent Aim%%FOV Radius", "FOV Radius##si_fov", 2, 1000, "%ipx")
-    TKEY("Silent Aim%%Show FOV Circle", "Show FOV Circle##si_show", "si_fovkey")
+    TKEYC("Silent Aim%%Show FOV Circle", "Show FOV Circle##si_show", "si_fovkey", {{"Silent Aim%%FOV Circle Color", "FOV Color##si_fovc"}})
     COL3("Silent Aim%%FOV Circle Color", "FOV Color##si_fovc")
     T("Silent Aim%%Use Dead FOV", "Use Dead FOV##si_used")
     SI("Silent Aim%%Dead FOV Radius", "Dead FOV Radius##si_dfov", 1, 1000, "%ipx")
-    TKEY("Silent Aim%%Show Dead FOV Circle", "Show Dead FOV##si_showd", "si_dfovkey")
+    TKEYC("Silent Aim%%Show Dead FOV Circle", "Show Dead FOV##si_showd", "si_dfovkey", {{"Silent Aim%%Dead FOV Circle Color", "Dead FOV Color##si_dfovc"}})
     COL3("Silent Aim%%Dead FOV Circle Color", "Dead FOV Color##si_dfovc")
 end)
 
@@ -4993,7 +5027,7 @@ end)
 
 library.add_group(LegitTab, "Backtrack", function()
     library.text("Backtracking")
-    TKEY("Backtracking%%Enabled", "Enabled##bt_en", "bt_key")
+    TKEYC("Backtracking%%Enabled", "Enabled##bt_en", "bt_key", {{"Backtracking%%Character Color", "Char Color##bt_col"}})
     COL3("Backtracking%%Character Color", "Char Color##bt_col")
     SI("Backtracking%%Refresh Rate", "Refresh Rate##bt_ref", 1, 10, "%i/s")
     SF("Backtracking%%Character Duration", "Duration##bt_dur", 0.1, 1, "%.1fs")
@@ -5002,7 +5036,7 @@ library.add_group(LegitTab, "Backtrack", function()
     T("Backtracking%%Clone Character", "Clone Character##bt_clone")
     library.separator()
     library.text("Hit Boxes")
-    TKEY("Hit Boxes%%Enabled", "Enabled##hb_en", "hb_key")
+    TKEYC("Hit Boxes%%Enabled", "Enabled##hb_en", "hb_key", {{"Hit Boxes%%Color", "Color##hb_col"}})
     COL3("Hit Boxes%%Color", "Color##hb_col")
     DD("Hit Boxes%%Hit Part", "Hit Part##hb_part")
     SI("Hit Boxes%%Size", "Size##hb_size", 1, 20, "%i")
@@ -5058,38 +5092,38 @@ end)
 -- ---------- Visuals / Enemy ESP ----------
 library.add_group(VisTab, "EnemyESP", function()
     T("Enemy ESP%%Enabled", "Enabled##esp_en")
-    T("Enemy ESP%%Boxes", "Boxes##esp_box")
+    TC("Enemy ESP%%Boxes", "Boxes##esp_box", {{"Enemy ESP%%Box Color", "Box Color##esp_boxc"}})
     COL3("Enemy ESP%%Box Color", "Box Color##esp_boxc")
     SI("Enemy ESP%%Box Opacity", "Box Opacity##esp_boxo", 1, 100, "%i%%")
-    T("Enemy ESP%%Box Outlines", "Box Outlines##esp_boxol")
+    TC("Enemy ESP%%Box Outlines", "Box Outlines##esp_boxol", {{"Enemy ESP%%Box Outline Color", "Outline Color##esp_boxolc"}})
     COL3("Enemy ESP%%Box Outline Color", "Outline Color##esp_boxolc")
     SI("Enemy ESP%%Box Outline Opacity", "Outline Opacity##esp_boxolo", 1, 100, "%i%%")
-    T("Enemy ESP%%Fill Boxes", "Fill Boxes##esp_fill")
+    TC("Enemy ESP%%Fill Boxes", "Fill Boxes##esp_fill", {{"Enemy ESP%%Box Inside Color", "Fill Color##esp_fillc"}})
     COL3("Enemy ESP%%Box Inside Color", "Fill Color##esp_fillc")
     SI("Enemy ESP%%Box Inside Opacity", "Fill Opacity##esp_fillo", 1, 100, "%i%%")
-    T("Enemy ESP%%Health Bar", "Health Bar##esp_hp")
+    TC("Enemy ESP%%Health Bar", "Health Bar##esp_hp", {{"Enemy ESP%%Damage Color", "Dmg Color##esp_dmg"}, {"Enemy ESP%%Health Color", "HP Color##esp_hpc"}})
     COL3("Enemy ESP%%Damage Color", "Dmg Color##esp_dmg")
     COL3("Enemy ESP%%Health Color", "HP Color##esp_hpc")
-    T("Enemy ESP%%Health Bar Outline", "HP Outline##esp_hpo")
+    TC("Enemy ESP%%Health Bar Outline", "HP Outline##esp_hpo", {{"Enemy ESP%%Health Outline Color", "HP Outl Color##esp_hpoc"}})
     COL3("Enemy ESP%%Health Outline Color", "HP Outl Color##esp_hpoc")
-    T("Enemy ESP%%Tracers", "Tracers##esp_tr")
+    TC("Enemy ESP%%Tracers", "Tracers##esp_tr", {{"Enemy ESP%%Tracer Color", "Tracer Color##esp_trc"}})
     COL3("Enemy ESP%%Tracer Color", "Tracer Color##esp_trc")
     SI("Enemy ESP%%Tracer Opacity", "Tracer Opacity##esp_tro", 1, 100, "%i%%")
-    T("Enemy ESP%%Tracer Outlines", "Tracer Outlines##esp_trol")
+    TC("Enemy ESP%%Tracer Outlines", "Tracer Outlines##esp_trol", {{"Enemy ESP%%Tracer Outline Color", "Tr Outl Color##esp_trolc"}})
     COL3("Enemy ESP%%Tracer Outline Color", "Tr Outl Color##esp_trolc")
     SI("Enemy ESP%%Tracer Outlines Opacity", "Tr Outl Opacity##esp_trolo", 1, 100, "%i%%")
     DD("Enemy ESP%%Tracer Origin", "Tracer Origin##esp_trorg")
-    T("Enemy ESP%%Names", "Names##esp_nm")
+    TC("Enemy ESP%%Names", "Names##esp_nm", {{"Enemy ESP%%Names Color", "Names Color##esp_nmc"}})
     COL3("Enemy ESP%%Names Color", "Names Color##esp_nmc")
-    T("Enemy ESP%%Weapons", "Weapons##esp_wp")
+    TC("Enemy ESP%%Weapons", "Weapons##esp_wp", {{"Enemy ESP%%Weapons Color", "Weapons Color##esp_wpc"}})
     COL3("Enemy ESP%%Weapons Color", "Weapons Color##esp_wpc")
-    T("Enemy ESP%%Distances", "Distances##esp_di")
+    TC("Enemy ESP%%Distances", "Distances##esp_di", {{"Enemy ESP%%Distances Color", "Dist Color##esp_dic"}})
     COL3("Enemy ESP%%Distances Color", "Dist Color##esp_dic")
-    T("Enemy ESP%%Health Percents", "Health Pct##esp_hpp")
+    TC("Enemy ESP%%Health Percents", "Health Pct##esp_hpp", {{"Enemy ESP%%Health Number Color", "HP Num Color##esp_hpnc"}})
     COL3("Enemy ESP%%Health Number Color", "HP Num Color##esp_hpnc")
-    T("Enemy ESP%%Text Outlines", "Text Outlines##esp_txo")
+    TC("Enemy ESP%%Text Outlines", "Text Outlines##esp_txo", {{"Enemy ESP%%Text Outline Color", "Text Outline##esp_txoc"}})
     COL3("Enemy ESP%%Text Outline Color", "Text Outline##esp_txoc")
-    T("Enemy ESP%%Highlight Chams", "Highlight Chams##esp_hl")
+    TC("Enemy ESP%%Highlight Chams", "Highlight Chams##esp_hl", {{"Enemy ESP%%Highlight Outline Color", "HL Outline##esp_hloc"}, {"Enemy ESP%%Highlight Fill Color", "HL Fill##esp_hlfc"}})
     COL3("Enemy ESP%%Highlight Outline Color", "HL Outline##esp_hloc")
     COL3("Enemy ESP%%Highlight Fill Color", "HL Fill##esp_hlfc")
     SI("Enemy ESP%%Highlight Fill Opacity", "HL Fill Opacity##esp_hlfo", 0, 100, "%i%%")
@@ -5099,33 +5133,33 @@ end)
 
 library.add_group(VisTab, "Chams", function()
     library.text("Arms")
-    T("Chams%%Arm Chams", "Arm Chams##ch_arm")
+    TC("Chams%%Arm Chams", "Arm Chams##ch_arm", {{"Chams%%Arm Color", "Arm Color##ch_armc"}})
     COL3("Chams%%Arm Color", "Arm Color##ch_armc")
     SI("Chams%%Arm Transparency", "Arm Transp##ch_armt", 0, 100, "%i%%")
     DD("Chams%%Arm Material", "Arm Material##ch_armm")
     library.separator()
     library.text("Guns")
-    T("Chams%%Gun Chams", "Gun Chams##ch_gun")
+    TC("Chams%%Gun Chams", "Gun Chams##ch_gun", {{"Chams%%Gun Color", "Gun Color##ch_gunc"}})
     COL3("Chams%%Gun Color", "Gun Color##ch_gunc")
     SI("Chams%%Gun Transparency", "Gun Transp##ch_gunt", 0, 100, "%i%%")
     DD("Chams%%Gun Material", "Gun Material##ch_gunm")
     library.separator()
     library.text("TP Character")
-    T("More Chams%%Third Person Character Chams", "TP Char Chams##mc_en")
+    TC("More Chams%%Third Person Character Chams", "TP Char Chams##mc_en", {{"More Chams%%Character Color", "Char Color##mc_c"}})
     COL3("More Chams%%Character Color", "Char Color##mc_c")
     SI("More Chams%%Character Transparency", "Char Transp##mc_t", 0, 100, "%i%%")
     DD("More Chams%%Character Material", "Char Material##mc_m")
     library.separator()
     library.text("World")
-    TKEY("World Visuals%%Ambient", "Ambient##wv_amb", "amb_key")
+    TKEYC("World Visuals%%Ambient", "Ambient##wv_amb", "amb_key", {{"World Visuals%%Ambient Color", "Amb Color##wv_ambc"}})
     COL3("World Visuals%%Ambient Color", "Amb Color##wv_ambc")
-    TKEY("World Visuals%%Bullet Tracers", "Bullet Tracers##wv_tr", "tr_key")
+    TKEYC("World Visuals%%Bullet Tracers", "Bullet Tracers##wv_tr", "tr_key", {{"World Visuals%%Color One", "Color One##wv_c1"}, {"World Visuals%%Color Two", "Color Two##wv_c2"}})
     COL3("World Visuals%%Color One", "Color One##wv_c1")
     COL3("World Visuals%%Color Two", "Color Two##wv_c2")
     SF("World Visuals%%Tracers Size", "Tracer Size##wv_trs", 0.05, 3, "%.2f")
     SI("World Visuals%%Tracers Transparency", "Tracer Transp##wv_trt", 0, 100, "%i%%")
     DD("World Visuals%%Tracers Material", "Tracer Mat##wv_trm")
-    TKEY("World Visuals%%Impact Points", "Impact Points##wv_pt", "pt_key")
+    TKEYC("World Visuals%%Impact Points", "Impact Points##wv_pt", "pt_key", {{"World Visuals%%Points Color", "Points Color##wv_ptc"}})
     COL3("World Visuals%%Points Color", "Points Color##wv_ptc")
     SI("World Visuals%%Points Transparency", "Points Transp##wv_ptt", 0, 100, "%i%%")
     DD("World Visuals%%Points Material", "Points Mat##wv_ptm")
@@ -5158,7 +5192,7 @@ library.add_group(VisTab, "ThirdPerson", function()
     SF("Custom Model%%Asset Offset Z", "Offset Z##cm_z", -10, 10, "%.1f")
     library.separator()
     library.text("Crosshair")
-    TKEY("Crosshair%%Enabled", "Enabled##ch_en", "ch_key")
+    TKEYC("Crosshair%%Enabled", "Enabled##ch_en", "ch_key", {{"Crosshair%%Crosshair Color", "Color##ch_c"}})
     COL3("Crosshair%%Crosshair Color", "Color##ch_c")
     T("Crosshair%%Show Dot", "Show Dot##ch_dot")
     T("Crosshair%%Follow Recoil", "Follow Recoil##ch_rec")
