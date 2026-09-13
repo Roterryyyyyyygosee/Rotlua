@@ -1300,6 +1300,7 @@ local UD = {
     ["Enemy ESP%%Distances"] = false,
     ["Enemy ESP%%Health Percents"] = false,
     ["Enemy ESP%%Text Outlines"] = true,
+    ["Enemy ESP%%Text Size"] = 13,
     ["Enemy ESP%%Highlight Chams"] = false,
     ["Enemy ESP%%Highlight Fill Opacity"] = 50,
     ["Enemy ESP%%Highlight Outline Opacity"] = 0,
@@ -3745,16 +3746,27 @@ LPH_JIT_MAX(function() -- Main Cheat
         return loadstring(patched)()
     end)()
     pcall(function()
-        local bold = DrawFont.Register(readfile("fonts/tahoma_bold.ttf"), { PixelSize = 18 })
-        local reg = DrawFont.Register(readfile("fonts/Tahoma.ttf"), { PixelSize = 18 })
-        if bold then
-            espInterface.sharedSettings.nameFont = bold
+        if typeof(DrawFont) == "table" then
+            local dn = readfile("fonts/tahoma_bold.ttf")
+            if dn and dn ~= "" then
+                local bold = DrawFont.Register(dn, { PixelSize = 13 })
+                if bold then
+                    espInterface.sharedSettings.nameFont = bold
+                end
+            end
+            local dh = readfile("fonts/Tahoma.ttf")
+            if dh and dh ~= "" then
+                local reg = DrawFont.Register(dh, { PixelSize = 13 })
+                if reg then
+                    espInterface.sharedSettings.textFont = reg
+                end
+            end
         end
-        if reg then
-            espInterface.sharedSettings.textFont = reg
-        end
-        espInterface.sharedSettings.textSize = 18
+        espInterface.sharedSettings.textSize = 13
     end)
+    callbackList["Enemy ESP%%Text Size"] = function(state)
+        espInterface.sharedSettings.textSize = math.clamp(tonumber(state) or 13, 5, 30)
+    end
     espInterface.teamSettings = {
         enemy = {
             enabled = true,
@@ -4959,6 +4971,17 @@ local function bind_of(id)
     return nil
 end
 
+-- group wrapper: a widget error inside must never abort the frame, or the
+-- library skips EndChild/End and Dear ImGui spams Missing-End popups.
+local function G(tab, name, fn)
+    return library.add_group(tab, name, function()
+        local ok, err = pcall(fn)
+        if not ok then
+            warn("[UDHUB] group '" .. tostring(name) .. "' failed: " .. tostring(err))
+        end
+    end)
+end
+
 local function TKEY(key, label, bindid)
     T(key, label)
     local b = bind_of(bindid)
@@ -4975,7 +4998,7 @@ local MiscTab = library.add_tab("Misc")
 local PlrTab = library.add_tab("Players")
 
 -- ---------- Legit / Aimbot ----------
-library.add_group(LegitTab, "Aimbot", function()
+G(LegitTab, "Aimbot", function()
     TKEY("Aim Bot%%Enabled", "Enabled##ab_en", "ab_key")
     T("Aim Bot%%Visible Check", "Visible Check##ab_vis")
     SF("Aim Bot%%Smoothness", "Smoothness##ab_sm", 0, 0.99, "%.2fx")
@@ -4983,21 +5006,21 @@ library.add_group(LegitTab, "Aimbot", function()
     T("Aim Bot%%Use FOV", "Use FOV##ab_usefov")
     SI("Aim Bot%%FOV Radius", "FOV Radius##ab_fov", 2, 1000, "%ipx")
     TKEYC("Aim Bot%%Show FOV Circle", "Show FOV Circle##ab_show", "ab_fovkey", {{"Aim Bot%%FOV Circle Color", "FOV Color##ab_fovc"}})
-    COL3("Aim Bot%%FOV Circle Color", "FOV Color##ab_fovc")
+    COL3("Aim Bot%%FOV Circle Color", "Aim FOV##ab_fovc")
     T("Aim Bot%%Use Dead FOV", "Use Dead FOV##ab_used")
     SI("Aim Bot%%Dead FOV Radius", "Dead FOV Radius##ab_dfov", 1, 1000, "%ipx")
     TKEYC("Aim Bot%%Show Dead FOV Circle", "Show Dead FOV##ab_showd", "ab_dfovkey", {{"Aim Bot%%Dead FOV Circle Color", "Dead FOV Color##ab_dfovc"}})
-    COL3("Aim Bot%%Dead FOV Circle Color", "Dead FOV Color##ab_dfovc")
+    COL3("Aim Bot%%Dead FOV Circle Color", "Aim Dead FOV##ab_dfovc")
 end)
 
-library.add_group(LegitTab, "FOV", function()
+G(LegitTab, "FOV", function()
     T("FOV Settings%%FOV Follows Recoil", "FOV Follows Recoil##fov_rec")
     T("FOV Settings%%Dynamic FOV", "Dynamic FOV##fov_dyn")
     SI("FOV Settings%%Circle Opacity", "Circle Opacity##fov_op", 1, 100, "%i%%")
     T("FOV Settings%%Fill Circles", "Fill Circles##fov_fill")
 end)
 
-library.add_group(LegitTab, "Silent", function()
+G(LegitTab, "Silent", function()
     TKEY("Silent Aim%%Enabled", "Enabled##si_en", "si_key")
     T("Silent Aim%%Visible Check", "Visible Check##si_vis")
     SI("Silent Aim%%Hit Chance", "Hit Chance##si_hit", 1, 100, "%i%%")
@@ -5005,14 +5028,14 @@ library.add_group(LegitTab, "Silent", function()
     T("Silent Aim%%Use FOV", "Use FOV##si_usefov")
     SI("Silent Aim%%FOV Radius", "FOV Radius##si_fov", 2, 1000, "%ipx")
     TKEYC("Silent Aim%%Show FOV Circle", "Show FOV Circle##si_show", "si_fovkey", {{"Silent Aim%%FOV Circle Color", "FOV Color##si_fovc"}})
-    COL3("Silent Aim%%FOV Circle Color", "FOV Color##si_fovc")
+    COL3("Silent Aim%%FOV Circle Color", "Silent FOV##si_fovc")
     T("Silent Aim%%Use Dead FOV", "Use Dead FOV##si_used")
     SI("Silent Aim%%Dead FOV Radius", "Dead FOV Radius##si_dfov", 1, 1000, "%ipx")
     TKEYC("Silent Aim%%Show Dead FOV Circle", "Show Dead FOV##si_showd", "si_dfovkey", {{"Silent Aim%%Dead FOV Circle Color", "Dead FOV Color##si_dfovc"}})
-    COL3("Silent Aim%%Dead FOV Circle Color", "Dead FOV Color##si_dfovc")
+    COL3("Silent Aim%%Dead FOV Circle Color", "Silent Dead FOV##si_dfovc")
 end)
 
-library.add_group(LegitTab, "GunMods", function()
+G(LegitTab, "GunMods", function()
     T("Gun Mods%%No Recoil", "No Recoil##gm_rec")
     T("Gun Mods%%No Spread", "No Spread##gm_spr")
     T("Gun Mods%%Small Crosshair", "Small Crosshair##gm_sm")
@@ -5025,10 +5048,10 @@ library.add_group(LegitTab, "GunMods", function()
     T("Gun Mods%%Instant Reload", "Instant Reload##gm_rel")
 end)
 
-library.add_group(LegitTab, "Backtrack", function()
+G(LegitTab, "Backtrack", function()
     library.text("Backtracking")
     TKEYC("Backtracking%%Enabled", "Enabled##bt_en", "bt_key", {{"Backtracking%%Character Color", "Char Color##bt_col"}})
-    COL3("Backtracking%%Character Color", "Char Color##bt_col")
+    COL3("Backtracking%%Character Color", "Backtrack##bt_col")
     SI("Backtracking%%Refresh Rate", "Refresh Rate##bt_ref", 1, 10, "%i/s")
     SF("Backtracking%%Character Duration", "Duration##bt_dur", 0.1, 1, "%.1fs")
     SI("Backtracking%%Character Transparency", "Transparency##bt_tr", 0, 100, "%i%%")
@@ -5037,7 +5060,7 @@ library.add_group(LegitTab, "Backtrack", function()
     library.separator()
     library.text("Hit Boxes")
     TKEYC("Hit Boxes%%Enabled", "Enabled##hb_en", "hb_key", {{"Hit Boxes%%Color", "Color##hb_col"}})
-    COL3("Hit Boxes%%Color", "Color##hb_col")
+    COL3("Hit Boxes%%Color", "Hitbox##hb_col")
     DD("Hit Boxes%%Hit Part", "Hit Part##hb_part")
     SI("Hit Boxes%%Size", "Size##hb_size", 1, 20, "%i")
     SI("Hit Boxes%%Transparency", "Transparency##hb_tr", 0, 100, "%i%%")
@@ -5045,7 +5068,7 @@ library.add_group(LegitTab, "Backtrack", function()
 end)
 
 -- ---------- Rage ----------
-library.add_group(RageTab, "RageBot", function()
+G(RageTab, "RageBot", function()
     TKEY("Rage Bot%%Enabled", "Enabled##rb_en", "rb_key")
     T("Rage Bot%%Shoot Effects", "Shoot Effects##rb_fx")
     T("Rage Bot%%Fire Position Scanning", "Fire Pos Scan##rb_fps")
@@ -5056,14 +5079,14 @@ library.add_group(RageTab, "RageBot", function()
     TKEY("Rage Bot%%Whitelist Friendly Status", "Whitelist Friend##rb_fr", "rb_fkey")
 end)
 
-library.add_group(RageTab, "Knife", function()
+G(RageTab, "Knife", function()
     TKEY("Knife Bot%%Kill All (May Despawn)", "Kill All##kb_en", "kb_key")
     T("Knife Bot%%Only When Holding Knife", "Only W/ Knife##kb_knife")
     TKEY("Knife Bot%%Only Kill Target Status", "Only Targets##kb_tar", "kb_tkey")
     TKEY("Knife Bot%%Whitelist Friendly Status", "Whitelist Friend##kb_fr", "kb_fkey")
 end)
 
-library.add_group(RageTab, "AntiAim", function()
+G(RageTab, "AntiAim", function()
     T("Anti Aim%%Enabled (May Cause Despawning)", "Enabled##aa_en")
     T("Anti Aim%%Yaw", "Yaw##aa_yaw")
     SI("Anti Aim%%Yaw Amount", "Yaw Amount##aa_yawa", 0, 360, "%i")
@@ -5080,7 +5103,7 @@ library.add_group(RageTab, "AntiAim", function()
     DD("Anti Aim%%Set Stance", "Stance##aa_stm")
 end)
 
-library.add_group(RageTab, "FakeLag", function()
+G(RageTab, "FakeLag", function()
     TKEY("Anti Aim%%Fake Lag", "Fake Lag##fl_en", "fl_key")
     T("Anti Aim%%Randomize Position", "Randomize Pos##fl_rnd")
     SF("Anti Aim%%X-Axis Factor", "X Factor##fl_x", 0, 8.9, "%.1f")
@@ -5090,38 +5113,39 @@ library.add_group(RageTab, "FakeLag", function()
 end)
 
 -- ---------- Visuals / Enemy ESP ----------
-library.add_group(VisTab, "EnemyESP", function()
+G(VisTab, "EnemyESP", function()
     T("Enemy ESP%%Enabled", "Enabled##esp_en")
     TC("Enemy ESP%%Boxes", "Boxes##esp_box", {{"Enemy ESP%%Box Color", "Box Color##esp_boxc"}})
-    COL3("Enemy ESP%%Box Color", "Box Color##esp_boxc")
+    COL3("Enemy ESP%%Box Color", "Box##esp_boxc")
     SI("Enemy ESP%%Box Opacity", "Box Opacity##esp_boxo", 1, 100, "%i%%")
     TC("Enemy ESP%%Box Outlines", "Box Outlines##esp_boxol", {{"Enemy ESP%%Box Outline Color", "Outline Color##esp_boxolc"}})
-    COL3("Enemy ESP%%Box Outline Color", "Outline Color##esp_boxolc")
+    COL3("Enemy ESP%%Box Outline Color", "Box Outline##esp_boxolc")
     SI("Enemy ESP%%Box Outline Opacity", "Outline Opacity##esp_boxolo", 1, 100, "%i%%")
     TC("Enemy ESP%%Fill Boxes", "Fill Boxes##esp_fill", {{"Enemy ESP%%Box Inside Color", "Fill Color##esp_fillc"}})
-    COL3("Enemy ESP%%Box Inside Color", "Fill Color##esp_fillc")
+    COL3("Enemy ESP%%Box Inside Color", "Box Fill##esp_fillc")
     SI("Enemy ESP%%Box Inside Opacity", "Fill Opacity##esp_fillo", 1, 100, "%i%%")
     TC("Enemy ESP%%Health Bar", "Health Bar##esp_hp", {{"Enemy ESP%%Damage Color", "Dmg Color##esp_dmg"}, {"Enemy ESP%%Health Color", "HP Color##esp_hpc"}})
-    COL3("Enemy ESP%%Damage Color", "Dmg Color##esp_dmg")
-    COL3("Enemy ESP%%Health Color", "HP Color##esp_hpc")
+    COL3("Enemy ESP%%Damage Color", "Damage##esp_dmg")
+    COL3("Enemy ESP%%Health Color", "Health##esp_hpc")
     TC("Enemy ESP%%Health Bar Outline", "HP Outline##esp_hpo", {{"Enemy ESP%%Health Outline Color", "HP Outl Color##esp_hpoc"}})
-    COL3("Enemy ESP%%Health Outline Color", "HP Outl Color##esp_hpoc")
+    COL3("Enemy ESP%%Health Outline Color", "HP Outline##esp_hpoc")
     TC("Enemy ESP%%Tracers", "Tracers##esp_tr", {{"Enemy ESP%%Tracer Color", "Tracer Color##esp_trc"}})
-    COL3("Enemy ESP%%Tracer Color", "Tracer Color##esp_trc")
+    COL3("Enemy ESP%%Tracer Color", "Tracer##esp_trc")
     SI("Enemy ESP%%Tracer Opacity", "Tracer Opacity##esp_tro", 1, 100, "%i%%")
     TC("Enemy ESP%%Tracer Outlines", "Tracer Outlines##esp_trol", {{"Enemy ESP%%Tracer Outline Color", "Tr Outl Color##esp_trolc"}})
-    COL3("Enemy ESP%%Tracer Outline Color", "Tr Outl Color##esp_trolc")
+    COL3("Enemy ESP%%Tracer Outline Color", "Tracer Outline##esp_trolc")
     SI("Enemy ESP%%Tracer Outlines Opacity", "Tr Outl Opacity##esp_trolo", 1, 100, "%i%%")
     DD("Enemy ESP%%Tracer Origin", "Tracer Origin##esp_trorg")
     TC("Enemy ESP%%Names", "Names##esp_nm", {{"Enemy ESP%%Names Color", "Names Color##esp_nmc"}})
-    COL3("Enemy ESP%%Names Color", "Names Color##esp_nmc")
+    COL3("Enemy ESP%%Names Color", "Name##esp_nmc")
     TC("Enemy ESP%%Weapons", "Weapons##esp_wp", {{"Enemy ESP%%Weapons Color", "Weapons Color##esp_wpc"}})
-    COL3("Enemy ESP%%Weapons Color", "Weapons Color##esp_wpc")
+    COL3("Enemy ESP%%Weapons Color", "Weapon##esp_wpc")
     TC("Enemy ESP%%Distances", "Distances##esp_di", {{"Enemy ESP%%Distances Color", "Dist Color##esp_dic"}})
-    COL3("Enemy ESP%%Distances Color", "Dist Color##esp_dic")
+    COL3("Enemy ESP%%Distances Color", "Distance##esp_dic")
     TC("Enemy ESP%%Health Percents", "Health Pct##esp_hpp", {{"Enemy ESP%%Health Number Color", "HP Num Color##esp_hpnc"}})
-    COL3("Enemy ESP%%Health Number Color", "HP Num Color##esp_hpnc")
+    COL3("Enemy ESP%%Health Number Color", "HP Number##esp_hpnc")
     TC("Enemy ESP%%Text Outlines", "Text Outlines##esp_txo", {{"Enemy ESP%%Text Outline Color", "Text Outline##esp_txoc"}})
+    SI("Enemy ESP%%Text Size", "Text Size##esp_tsz", 8, 24, "%i")
     COL3("Enemy ESP%%Text Outline Color", "Text Outline##esp_txoc")
     TC("Enemy ESP%%Highlight Chams", "Highlight Chams##esp_hl", {{"Enemy ESP%%Highlight Outline Color", "HL Outline##esp_hloc"}, {"Enemy ESP%%Highlight Fill Color", "HL Fill##esp_hlfc"}})
     COL3("Enemy ESP%%Highlight Outline Color", "HL Outline##esp_hloc")
@@ -5131,42 +5155,42 @@ library.add_group(VisTab, "EnemyESP", function()
     T("Enemy ESP%%Highlight Visible Check", "HL Vis Check##esp_hlvis")
 end)
 
-library.add_group(VisTab, "Chams", function()
+G(VisTab, "Chams", function()
     library.text("Arms")
     TC("Chams%%Arm Chams", "Arm Chams##ch_arm", {{"Chams%%Arm Color", "Arm Color##ch_armc"}})
-    COL3("Chams%%Arm Color", "Arm Color##ch_armc")
+    COL3("Chams%%Arm Color", "Arm##ch_armc")
     SI("Chams%%Arm Transparency", "Arm Transp##ch_armt", 0, 100, "%i%%")
     DD("Chams%%Arm Material", "Arm Material##ch_armm")
     library.separator()
     library.text("Guns")
     TC("Chams%%Gun Chams", "Gun Chams##ch_gun", {{"Chams%%Gun Color", "Gun Color##ch_gunc"}})
-    COL3("Chams%%Gun Color", "Gun Color##ch_gunc")
+    COL3("Chams%%Gun Color", "Gun##ch_gunc")
     SI("Chams%%Gun Transparency", "Gun Transp##ch_gunt", 0, 100, "%i%%")
     DD("Chams%%Gun Material", "Gun Material##ch_gunm")
     library.separator()
     library.text("TP Character")
     TC("More Chams%%Third Person Character Chams", "TP Char Chams##mc_en", {{"More Chams%%Character Color", "Char Color##mc_c"}})
-    COL3("More Chams%%Character Color", "Char Color##mc_c")
+    COL3("More Chams%%Character Color", "TP Char##mc_c")
     SI("More Chams%%Character Transparency", "Char Transp##mc_t", 0, 100, "%i%%")
     DD("More Chams%%Character Material", "Char Material##mc_m")
     library.separator()
     library.text("World")
     TKEYC("World Visuals%%Ambient", "Ambient##wv_amb", "amb_key", {{"World Visuals%%Ambient Color", "Amb Color##wv_ambc"}})
-    COL3("World Visuals%%Ambient Color", "Amb Color##wv_ambc")
+    COL3("World Visuals%%Ambient Color", "Ambient##wv_ambc")
     TKEYC("World Visuals%%Bullet Tracers", "Bullet Tracers##wv_tr", "tr_key", {{"World Visuals%%Color One", "Color One##wv_c1"}, {"World Visuals%%Color Two", "Color Two##wv_c2"}})
-    COL3("World Visuals%%Color One", "Color One##wv_c1")
-    COL3("World Visuals%%Color Two", "Color Two##wv_c2")
+    COL3("World Visuals%%Color One", "Tracer A##wv_c1")
+    COL3("World Visuals%%Color Two", "Tracer B##wv_c2")
     SF("World Visuals%%Tracers Size", "Tracer Size##wv_trs", 0.05, 3, "%.2f")
     SI("World Visuals%%Tracers Transparency", "Tracer Transp##wv_trt", 0, 100, "%i%%")
     DD("World Visuals%%Tracers Material", "Tracer Mat##wv_trm")
     TKEYC("World Visuals%%Impact Points", "Impact Points##wv_pt", "pt_key", {{"World Visuals%%Points Color", "Points Color##wv_ptc"}})
-    COL3("World Visuals%%Points Color", "Points Color##wv_ptc")
+    COL3("World Visuals%%Points Color", "Impact##wv_ptc")
     SI("World Visuals%%Points Transparency", "Points Transp##wv_ptt", 0, 100, "%i%%")
     DD("World Visuals%%Points Material", "Points Mat##wv_ptm")
     SF("World Visuals%%Duration", "Duration##wv_dur", 1, 5, "%.1fs")
 end)
 
-library.add_group(VisTab, "ThirdPerson", function()
+G(VisTab, "ThirdPerson", function()
     TKEY("Third Person%%Enabled", "Enabled##tp_en", "tp_key")
     T("Third Person%%Show Character", "Show Character##tp_show")
     T("Third Person%%Show Character While Aiming", "Show While Aiming##tp_aim")
@@ -5193,7 +5217,7 @@ library.add_group(VisTab, "ThirdPerson", function()
     library.separator()
     library.text("Crosshair")
     TKEYC("Crosshair%%Enabled", "Enabled##ch_en", "ch_key", {{"Crosshair%%Crosshair Color", "Color##ch_c"}})
-    COL3("Crosshair%%Crosshair Color", "Color##ch_c")
+    COL3("Crosshair%%Crosshair Color", "Crosshair##ch_c")
     T("Crosshair%%Show Dot", "Show Dot##ch_dot")
     T("Crosshair%%Follow Recoil", "Follow Recoil##ch_rec")
     SI("Crosshair%%X Size", "X Size##ch_xs", 1, 50, "%i")
@@ -5206,7 +5230,7 @@ library.add_group(VisTab, "ThirdPerson", function()
 end)
 
 -- ---------- Misc ----------
-library.add_group(MiscTab, "Movement", function()
+G(MiscTab, "Movement", function()
     TKEY("Movement%%Walk Speed", "Walk Speed##mv_ws", "ws_key")
     SI("Movement%%Set Speed", "Set Speed##mv_set", 10, 250, "%i")
     TKEY("Movement%%Jump Power", "Jump Power##mv_jp", "jp_key")
@@ -5216,7 +5240,7 @@ library.add_group(MiscTab, "Movement", function()
     T("Movement%%Only While Jumping", "Only While Jump##mv_oj")
 end)
 
-library.add_group(MiscTab, "Sounds", function()
+G(MiscTab, "Sounds", function()
     DD("Sounds%%Shoot Sound", "Shoot##sn_sh")
     DD("Sounds%%Hit Sound", "Hit##sn_hit")
     DD("Sounds%%Kill Sound", "Kill##sn_kill")
@@ -5225,7 +5249,7 @@ library.add_group(MiscTab, "Sounds", function()
     DD("Sounds%%Footstep Sound", "Footstep##sn_step")
 end)
 
-library.add_group(MiscTab, "Tweaks", function()
+G(MiscTab, "Tweaks", function()
     T("Tweaks%%Custom Kill Notification", "Custom Kill Notif##tw_kn")
     if HAS_INPUT then
         library.text("Notif Text")
@@ -5256,13 +5280,13 @@ library.add_group(MiscTab, "Tweaks", function()
     end
 end)
 
-library.add_group(MiscTab, "ChatSpam", function()
+G(MiscTab, "ChatSpam", function()
     TKEY("Chat Spam%%Enabled", "Enabled##cs_en", "cs_key")
     DD("Chat Spam%%Spam List", "Spam List##cs_list")
     SF("Chat Spam%%Spam Delay", "Spam Delay##cs_delay", 2.51, 5, "%.2fs")
 end)
 
-library.add_group(MiscTab, "Hopper", function()
+G(MiscTab, "Hopper", function()
     if ud_button("Server Hop##hop_go") then
         pcall(callbackList["Server Hopper%%Server Hop"])
     end
@@ -5277,7 +5301,7 @@ library.add_group(MiscTab, "Hopper", function()
     end
 end)
 
-library.add_group(MiscTab, "Cheat", function()
+G(MiscTab, "Cheat", function()
     if ud_button("Copy Discord##ch_dc") then
         pcall(setclipboard, "https://discord.gg/tUEJZYvF9d")
     end
@@ -5288,7 +5312,7 @@ end)
 
 -- ---------- Players ----------
 local PlrKey = ""
-library.add_group(PlrTab, "Players", function()
+G(PlrTab, "Players", function()
     DD("PlayerList%%Selected", "Player##pl_sel")
     DD("PlayerList%%Status", "Status##pl_st")
     if ud_button("Refresh##pl_ref") then
